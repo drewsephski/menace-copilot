@@ -1,6 +1,6 @@
 'use strict';
 
-const { getPolarApiOrigin, loadBenefitCatalog } = require('./gatewayConfig');
+const { getPolarApiOrigin, loadBenefitCatalog, getPolarOrganizationId } = require('./gatewayConfig');
 const { resolveHostedAiEntitlement } = require('./hostedAiEntitlement');
 
 function extractBearerToken(headerValue) {
@@ -17,7 +17,7 @@ function licenseFromPayload(payload) {
 }
 
 async function validateLicenseKey(licenseKey) {
-    const organizationId = process.env.POLAR_ORGANIZATION_ID || '';
+    const organizationId = getPolarOrganizationId();
     if (!organizationId) {
         throw new Error('POLAR_ORGANIZATION_ID is not configured');
     }

@@ -1,0 +1,26 @@
+{
+    "server": "production",
+    "organizationId": "fec950ab-2105-4cff-91b3-165b541c1663",
+    "checkout": {
+        "search_pass": "https://api.polar.sh/v1/checkout-links/polar_cl_KTTV9epSEVqEQ29pqzBgJwnxetHRb65GfJf0Y3FPc3Y/redirect",
+        "monthly": "https://api.polar.sh/v1/checkout-links/polar_cl_yFOI4SdXApw2w0phQZnhL8jThH50xuPIfL5Ah4LLmfG/redirect",
+        "byok_monthly": "https://api.polar.sh/v1/checkout-links/polar_cl_ViuB3ZlqkrvW6iTxziQjReb8568yVvOQegahp1kc6lg/redirect"
+    },
+    "benefits": {
+        "search_pass": {
+            "id": "fdb9688d-8205-47a5-ac86-b9869182b809",
+            "label": "Menace overlay license (90-day)",
+            "hostedAi": true
+        },
+        "monthly": {
+            "id": "3ed2eb65-7112-4ca7-9ca1-d8408acffaed",
+            "label": "Menace overlay license (monthly)",
+            "hostedAi": true
+        },
+        "byok_monthly": {
+            "id": "83569dba-0d15-4012-b704-240645f67487",
+            "label": "Menace BYOK license (monthly)",
+            "hostedAi": false
+        }
+    }
+}

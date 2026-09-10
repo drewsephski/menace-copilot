@@ -1,12 +1,7 @@
 'use strict';
 
-const {
-    FACT_ARRAY_KEYS,
-    COMMUNICATION_KEYS,
-    PROFILE_CATEGORY_MAP,
-    CATEGORY_LABELS,
-    LIMITS,
-} = require('./constants');
+const { FACT_ARRAY_KEYS, COMMUNICATION_KEYS, PROFILE_CATEGORY_MAP, CATEGORY_LABELS, LIMITS } = require('./constants');
+
 function normalizeProfileForRender(profile) {
     if (!profile || profile === 'exam') {
         return 'custom';
@@ -63,6 +58,66 @@ function renderCommunicationBlock(communication) {
     return `Communication:\n${sections.join('\n')}`;
 }
 
+function joinSections(sections) {
+    return sections.filter(Boolean).join('\n\n');
+}
+
+function trimSectionToBudget(section, maxChars) {
+    if (!section || section.length <= maxChars) {
+        return section;
+    }
+
+    const headerEnd = section.indexOf(':\n');
+    if (headerEnd === -1) {
+        return '';
+    }
+
+    const header = section.slice(0, headerEnd + 2);
+    const body = section.slice(headerEnd + 2);
+    const lines = body.split('\n').filter(Boolean);
+    const kept = [];
+
+    for (const line of lines) {
+        const candidate = `${header}${kept.concat(line).join('\n')}`;
+        if (candidate.length > maxChars) {
+            break;
+        }
+        kept.push(line);
+    }
+
+    if (kept.length === 0) {
+        return '';
+    }
+
+    return `${header}${kept.join('\n')}`;
+}
+
+function trimRenderedSectionsToBudget(sections, maxChars) {
+    const kept = [];
+
+    for (const section of sections) {
+        const prefix = kept.length > 0 ? '\n\n' : '';
+        const next = kept.length > 0 ? `${joinSections(kept)}${prefix}${section}` : section;
+        if (next.length <= maxChars) {
+            kept.push(section);
+            continue;
+        }
+
+        const remaining = maxChars - (kept.length > 0 ? joinSections(kept).length + 2 : 0);
+        if (remaining <= 0) {
+            break;
+        }
+
+        const trimmed = trimSectionToBudget(section, remaining);
+        if (trimmed) {
+            kept.push(trimmed);
+        }
+        break;
+    }
+
+    return joinSections(kept);
+}
+
 function renderPersonalContextForProfile(personalContext, profile) {
     if (!personalContext) {
         return '';
@@ -91,15 +146,11 @@ function renderPersonalContextForProfile(personalContext, profile) {
         return '';
     }
 
-    let rendered = sections.join('\n\n');
-    if (rendered.length > LIMITS.maxRenderedChars) {
-        rendered = `${rendered.slice(0, LIMITS.maxRenderedChars - 3)}...`;
-    }
-
-    return rendered;
+    return trimRenderedSectionsToBudget(sections, LIMITS.maxRenderedChars);
 }
 
 module.exports = {
     renderPersonalContextForProfile,
     formatFactLine,
+    trimRenderedSectionsToBudget,
 };

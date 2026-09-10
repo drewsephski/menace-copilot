@@ -375,7 +375,12 @@ function setupPersonalContextIpcHandlers() {
         try {
             const result = personalContextStorage.setPersonalContext(context, options);
             if (!result.ok) {
-                return { success: false, errors: result.errors, warnings: result.warnings || [] };
+                return {
+                    success: false,
+                    errors: result.errors,
+                    error: result.errors?.[0] || 'Could not save personal context.',
+                    warnings: result.warnings || [],
+                };
             }
             return { success: true, data: result.metadata, warnings: result.warnings || [] };
         } catch (error) {

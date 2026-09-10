@@ -1,7 +1,7 @@
 {
-    "functions": {
-        "api/v1/chat/completions.js": {
-            "maxDuration": 60
-        }
-    }
+    "$schema": "https://openapi.vercel.sh/vercel.json",
+    "framework": null,
+    "buildCommand": null,
+    "installCommand": null,
+    "outputDirectory": "."
 }

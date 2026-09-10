@@ -1,42 +1,25 @@
 'use strict';
 
-const fs = require('fs');
-const path = require('path');
+const { loadPolarProductionConfig } = require('../config/loadPolarProductionConfig');
 
 /**
  * Public Polar checkout config. These values are not secrets:
  * organization ID is required by Polar's customer-portal license API,
  * and checkout links are meant to be opened in a browser.
  *
- * Production values are written by:
- *   node scripts/sync-polar-production.js --write
+ * Production values live in src/config/polarProduction.public.json and are
+ * refreshed by: node scripts/sync-polar-production.js --write
  *
  * Never put a Polar access token in this file.
  */
-function loadGeneratedConfig() {
-    const generatedPath = path.join(__dirname, 'polarConfig.generated.json');
-    if (!fs.existsSync(generatedPath)) {
-        return null;
-    }
-
-    try {
-        return JSON.parse(fs.readFileSync(generatedPath, 'utf8'));
-    } catch (error) {
-        console.warn('Could not read polarConfig.generated.json:', error.message);
-        return null;
-    }
-}
-
-const generated = loadGeneratedConfig();
+const generated = loadPolarProductionConfig();
 
 const SERVER = process.env.POLAR_SERVER || generated?.server || 'production';
 
 const POLAR_CONFIG = {
     server: SERVER,
     organizationId:
-        process.env.POLAR_ORGANIZATION_ID ||
-        generated?.organizationId ||
-        (SERVER === 'sandbox' ? '5bc5f1d2-0e3c-40b3-a743-6b9596ada683' : ''),
+        process.env.POLAR_ORGANIZATION_ID || generated?.organizationId || (SERVER === 'sandbox' ? '5bc5f1d2-0e3c-40b3-a743-6b9596ada683' : ''),
     checkout: {
         monthly:
             process.env.POLAR_CHECKOUT_MONTHLY_URL ||

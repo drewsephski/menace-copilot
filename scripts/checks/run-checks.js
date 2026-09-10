@@ -10,6 +10,7 @@ const CHECKS = [
     'check-storage-migration.js',
     'check-update-source.js',
     'check-public-runtime-config.js',
+    'check-polar-production-config.js',
     'check-prompt-fallback.js',
     'check-startup-smoke.js',
 ];

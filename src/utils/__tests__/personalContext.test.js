@@ -122,11 +122,34 @@ describe('personal context rendering', () => {
         assert.doesNotMatch(rendered, /Weekly leadership sync/);
     });
 
-    test('custom profile includes all categories within budget', () => {
+    test('custom profile includes all categories within budget without cutting facts in half', () => {
         const normalized = validateAndNormalizePersonalContext(SAMPLE_CONTEXT).data;
         const rendered = renderPersonalContextForProfile(normalized, 'custom');
         assert.match(rendered, /Cannot relocate/);
         assert.ok(rendered.length <= LIMITS.maxRenderedChars);
+        assert.doesNotMatch(rendered, /\.\.\.$/);
+        for (const line of rendered.split('\n')) {
+            if (line.startsWith('- ')) {
+                assert.ok(line.length > 2);
+            }
+        }
+    });
+
+    test('large profile trims whole facts while preserving category boundaries', () => {
+        const manyFacts = Array.from({ length: 40 }, (_, index) => ({
+            fact: `Structured fact number ${index} with enough detail to consume budget`,
+            confidence: 'high',
+            lastKnown: null,
+        }));
+        const payload = validateAndNormalizePersonalContext({
+            ...SAMPLE_CONTEXT,
+            skills: manyFacts,
+            interests: manyFacts,
+        }).data;
+        const rendered = renderPersonalContextForProfile(payload, 'custom');
+        assert.ok(rendered.length <= LIMITS.maxRenderedChars);
+        assert.doesNotMatch(rendered, /Structured fact number 39 with enough/);
+        assert.match(rendered, /Structured fact number 0 with enough/);
     });
 
     test('returns empty string when no context', () => {
@@ -208,6 +231,24 @@ describe('prompt integration', () => {
 describe('personal context storage encryption', () => {
     let tempDir;
 
+    function mockSafeStorage(available) {
+        process.env.MENACE_TEST_MOCK_ENCRYPTION = '1';
+        global.__menaceTestSafeStorage = {
+            isEncryptionAvailable: () => available,
+            encryptString(value) {
+                return Buffer.from(`enc:${value}`, 'utf8');
+            },
+            decryptString(buffer) {
+                return buffer.toString('utf8').slice(4);
+            },
+        };
+    }
+
+    function clearSafeStorageMock() {
+        delete process.env.MENACE_TEST_MOCK_ENCRYPTION;
+        delete global.__menaceTestSafeStorage;
+    }
+
     beforeEach(() => {
         tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'menace-pc-test-'));
         process.env.NODE_ENV = 'test';
@@ -217,6 +258,7 @@ describe('personal context storage encryption', () => {
     });
 
     afterEach(() => {
+        clearSafeStorageMock();
         delete process.env.MENACE_TEST_CONFIG_DIR;
         delete process.env.NODE_ENV;
         fs.rmSync(tempDir, { recursive: true, force: true });
@@ -224,7 +266,38 @@ describe('personal context storage encryption', () => {
         delete require.cache[require.resolve('../personalContextStorage')];
     });
 
+    test('fails closed when OS encryption is unavailable', () => {
+        mockSafeStorage(false);
+        const personalContextStorage = require('../personalContextStorage');
+
+        const result = personalContextStorage.setPersonalContext(SAMPLE_CONTEXT);
+        assert.equal(result.ok, false);
+        assert.match(result.errors[0], /Secure storage is unavailable/i);
+        assert.equal(fs.existsSync(path.join(tempDir, 'personal-context.json')), false);
+    });
+
+    test('encrypts payload at rest when OS encryption is available', () => {
+        mockSafeStorage(true);
+        const personalContextStorage = require('../personalContextStorage');
+        const sentinel = `menace-encryption-sentinel-${Date.now()}`;
+
+        const context = {
+            ...SAMPLE_CONTEXT,
+            identity: [{ fact: sentinel, confidence: 'high', lastKnown: null }],
+        };
+
+        const saved = personalContextStorage.setPersonalContext(context);
+        assert.equal(saved.ok, true);
+
+        const rawFile = fs.readFileSync(path.join(tempDir, 'personal-context.json'), 'utf8');
+        assert.doesNotMatch(rawFile, new RegExp(sentinel));
+
+        const loaded = personalContextStorage.getPersonalContext();
+        assert.equal(loaded.identity.some(entry => entry.fact === sentinel), true);
+    });
+
     test('replace and clear semantics persist locally', () => {
+        mockSafeStorage(true);
         const personalContextStorage = require('../personalContextStorage');
 
         const first = personalContextStorage.setPersonalContext(SAMPLE_CONTEXT);

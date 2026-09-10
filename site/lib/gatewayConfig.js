@@ -28,6 +28,20 @@ const DAILY_TOKEN_BUDGET = 250_000;
 // Defense in depth: also set an account-level monthly spend ceiling in the OpenRouter dashboard.
 // See https://openrouter.ai/settings/limits
 
+const PUBLIC_CONFIG_PATH = path.join(__dirname, 'polarProduction.public.json');
+
+function loadPublicPolarConfig() {
+    if (!fs.existsSync(PUBLIC_CONFIG_PATH)) {
+        return null;
+    }
+
+    try {
+        return JSON.parse(fs.readFileSync(PUBLIC_CONFIG_PATH, 'utf8'));
+    } catch {
+        return null;
+    }
+}
+
 function loadBenefitCatalog() {
     if (process.env.MENACE_POLAR_BENEFITS_JSON) {
         try {
@@ -37,17 +51,16 @@ function loadBenefitCatalog() {
         }
     }
 
-    const generatedPath = path.join(__dirname, '..', '..', 'src', 'utils', 'polarConfig.generated.json');
-    if (fs.existsSync(generatedPath)) {
-        try {
-            const generated = JSON.parse(fs.readFileSync(generatedPath, 'utf8'));
-            return normalizeBenefitCatalog(generated.benefits || {});
-        } catch {
-            return normalizeBenefitCatalog({});
-        }
+    const publicConfig = loadPublicPolarConfig();
+    if (publicConfig) {
+        return normalizeBenefitCatalog(publicConfig.benefits || {});
     }
 
     return normalizeBenefitCatalog({});
+}
+
+function getPolarOrganizationId() {
+    return process.env.POLAR_ORGANIZATION_ID || loadPublicPolarConfig()?.organizationId || '';
 }
 
 function getPolarApiOrigin() {
@@ -71,9 +84,7 @@ function clampMaxTokens(value) {
 }
 
 function getProductionModel() {
-    const configured = typeof process.env.MENACE_GATEWAY_MODEL === 'string'
-        ? process.env.MENACE_GATEWAY_MODEL.trim()
-        : '';
+    const configured = typeof process.env.MENACE_GATEWAY_MODEL === 'string' ? process.env.MENACE_GATEWAY_MODEL.trim() : '';
     if (configured && ALLOWED_MODELS.has(configured)) {
         return configured;
     }
@@ -97,6 +108,7 @@ module.exports = {
     DAILY_REQUEST_LIMIT,
     DAILY_TOKEN_BUDGET,
     loadBenefitCatalog,
+    getPolarOrganizationId,
     getPolarApiOrigin,
     clampTemperature,
     clampMaxTokens,

@@ -2,7 +2,7 @@
 'use strict';
 
 /**
- * Sync production Polar org + checkout links into polarConfig.generated.json.
+ * Sync production Polar org + checkout links into polarProduction.public.json.
  *
  * Requires in .env:
  *   POLAR_ACCESS_TOKEN=...   (production org token from polar.sh → Settings → Developers)
@@ -29,8 +29,7 @@ const PRODUCT_SPECS = [
     {
         sku: 'search_pass',
         name: '90-Day Pass',
-        description:
-            '90 days of Menace Agent with included hosted AI answers, screen context, and local Whisper transcription.',
+        description: '90 days of Menace Agent with included hosted AI answers, screen context, and local Whisper transcription.',
         recurring: false,
         priceAmount: 7900,
         licenseLabel: 'Menace overlay license (90-day)',
@@ -40,8 +39,7 @@ const PRODUCT_SPECS = [
     {
         sku: 'monthly',
         name: 'Monthly',
-        description:
-            'Monthly Menace Agent with included hosted AI answers, screen context, and local Whisper transcription.',
+        description: 'Monthly Menace Agent with included hosted AI answers, screen context, and local Whisper transcription.',
         recurring: true,
         priceAmount: 3900,
         licenseLabel: 'Menace overlay license (monthly)',
@@ -51,8 +49,7 @@ const PRODUCT_SPECS = [
     {
         sku: 'byok_monthly',
         name: 'BYOK',
-        description:
-            'Bring your own API keys. App license for overlay, Gemini Live, and screen context without hosted AI.',
+        description: 'Bring your own API keys. App license for overlay, Gemini Live, and screen context without hosted AI.',
         recurring: true,
         priceAmount: 1500,
         licenseLabel: 'Menace BYOK license (monthly)',
@@ -169,10 +166,7 @@ async function createLicenseBenefit(label, expiresDays) {
 async function ensureBenefit(spec, benefitsByLabel) {
     let benefit = benefitsByLabel.get(spec.licenseLabel);
     if (!benefit) {
-        benefit = await createLicenseBenefit(
-            spec.licenseLabel,
-            spec.licenseExpires ? spec.licenseExpires.days : null
-        );
+        benefit = await createLicenseBenefit(spec.licenseLabel, spec.licenseExpires ? spec.licenseExpires.days : null);
         benefitsByLabel.set(spec.licenseLabel, benefit);
     }
 
@@ -287,14 +281,8 @@ async function main() {
     console.log(`Organization: ${org.name} (${org.id}) slug=${org.slug} server=${SERVER}`);
     console.log(`Mode: ${DRY_RUN ? 'dry-run/report' : 'write'}`);
 
-    const [products, links, benefits] = await Promise.all([
-        listProducts(org.id),
-        listCheckoutLinks(org.id),
-        listBenefits(),
-    ]);
-    const benefitsByLabel = new Map(
-        benefits.filter(item => item.type === 'license_keys').map(item => [item.description, item])
-    );
+    const [products, links, benefits] = await Promise.all([listProducts(org.id), listCheckoutLinks(org.id), listBenefits()]);
+    const benefitsByLabel = new Map(benefits.filter(item => item.type === 'license_keys').map(item => [item.description, item]));
 
     const checkout = {};
     const benefitCatalog = {};
@@ -322,11 +310,15 @@ async function main() {
     console.log('\nSync report:\n', JSON.stringify(report, null, 2));
 
     if (WRITE) {
-        const outPath = path.join(__dirname, '..', 'src', 'utils', 'polarConfig.generated.json');
-        fs.writeFileSync(outPath, `${JSON.stringify(generated, null, 4)}\n`, 'utf8');
-        console.log(`\nWrote ${outPath}`);
+        const generatedJson = `${JSON.stringify(generated, null, 4)}\n`;
+        const appPath = path.join(__dirname, '..', 'src', 'config', 'polarProduction.public.json');
+        const sitePath = path.join(__dirname, '..', 'site', 'lib', 'polarProduction.public.json');
+        fs.writeFileSync(appPath, generatedJson, 'utf8');
+        fs.writeFileSync(sitePath, generatedJson, 'utf8');
+        console.log(`\nWrote ${appPath}`);
+        console.log(`Wrote ${sitePath}`);
     } else {
-        console.log('\nDry-run only. Run with --write to save src/utils/polarConfig.generated.json');
+        console.log('\nDry-run only. Run with --write to save src/config/polarProduction.public.json');
     }
 }
 

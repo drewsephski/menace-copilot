@@ -2,24 +2,39 @@
 
 const fs = require('fs');
 const path = require('path');
-const { safeStorage } = require('electron');
 const { getConfigDir } = require('../storage');
-const {
-    validateAndNormalizePersonalContext,
-    buildPersonalContextMetadata,
-    parsePersonalContextImport,
-} = require('./personalContext/schema');
+const { validateAndNormalizePersonalContext, buildPersonalContextMetadata, parsePersonalContextImport } = require('./personalContext/schema');
 const { buildChatGPTPersonalContextExportPrompt } = require('./personalContext/importPrompt');
 
 const ENCRYPTED_PREFIX = '__enc__:';
+const ENCRYPTION_UNAVAILABLE_ERROR =
+    'Secure storage is unavailable on this Mac. Personal Context cannot be saved until macOS encryption is available.';
 
 function getPersonalContextPath() {
     return path.join(getConfigDir(), 'personal-context.json');
 }
 
+function getSafeStorage() {
+    if (process.env.MENACE_TEST_MOCK_ENCRYPTION === '1' && global.__menaceTestSafeStorage) {
+        return global.__menaceTestSafeStorage;
+    }
+
+    try {
+        const electron = require('electron');
+        if (electron && typeof electron === 'object' && electron.safeStorage) {
+            return electron.safeStorage;
+        }
+    } catch {
+        return null;
+    }
+
+    return null;
+}
+
 function isEncryptionAvailable() {
     try {
-        return safeStorage.isEncryptionAvailable();
+        const storage = getSafeStorage();
+        return Boolean(storage && typeof storage.isEncryptionAvailable === 'function' && storage.isEncryptionAvailable());
     } catch {
         return false;
     }
@@ -31,10 +46,11 @@ function encryptPayload(plaintext) {
     }
 
     if (!isEncryptionAvailable()) {
-        return plaintext;
+        return null;
     }
 
-    const encrypted = safeStorage.encryptString(plaintext);
+    const storage = getSafeStorage();
+    const encrypted = storage.encryptString(plaintext);
     return `${ENCRYPTED_PREFIX}${encrypted.toString('base64')}`;
 }
 
@@ -53,8 +69,9 @@ function decryptPayload(stored) {
     }
 
     try {
+        const storage = getSafeStorage();
         const buffer = Buffer.from(stored.slice(ENCRYPTED_PREFIX.length), 'base64');
-        return safeStorage.decryptString(buffer);
+        return storage.decryptString(buffer);
     } catch (error) {
         console.warn('Failed to decrypt personal context:', error.message);
         return '';
@@ -119,10 +136,27 @@ function setPersonalContext(context, { sourceOverride } = {}) {
         importedAt: new Date().toISOString(),
     };
 
+    if (!isEncryptionAvailable()) {
+        return {
+            ok: false,
+            errors: [ENCRYPTION_UNAVAILABLE_ERROR],
+            warnings: result.warnings,
+        };
+    }
+
+    const payload = encryptPayload(JSON.stringify(toStore));
+    if (payload === null) {
+        return {
+            ok: false,
+            errors: [ENCRYPTION_UNAVAILABLE_ERROR],
+            warnings: result.warnings,
+        };
+    }
+
     const envelope = {
         version: 1,
-        encrypted: isEncryptionAvailable(),
-        payload: encryptPayload(JSON.stringify(toStore)),
+        encrypted: true,
+        payload,
     };
 
     writeStoredEnvelope(envelope);
@@ -154,4 +188,6 @@ module.exports = {
     getPersonalContextMetadata,
     parsePersonalContextImport,
     buildChatGPTPersonalContextExportPrompt,
+    ENCRYPTION_UNAVAILABLE_ERROR,
+    isEncryptionAvailable,
 };

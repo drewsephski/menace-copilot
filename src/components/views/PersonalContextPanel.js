@@ -718,6 +718,7 @@ export class PersonalContextPanel extends LitElement {
 
             if (!result.success) {
                 this._previewErrors = result.errors || [result.error || 'Could not save personal context'];
+                this._showToast(this._previewErrors[0], 'error', 4500);
                 return;
             }
 
