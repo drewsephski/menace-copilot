@@ -11,6 +11,7 @@ const CHECKS = [
     'check-update-source.js',
     'check-public-runtime-config.js',
     'check-polar-production-config.js',
+    'check-polar-config-parity.js',
     'check-prompt-fallback.js',
     'check-startup-smoke.js',
 ];

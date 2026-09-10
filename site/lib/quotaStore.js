@@ -7,6 +7,7 @@ const {
     DAILY_REQUEST_LIMIT,
     DAILY_TOKEN_BUDGET,
     MAX_OUTPUT_TOKENS,
+    QUOTA_ESTIMATED_OUTPUT_TOKENS,
 } = require('./gatewayConfig');
 
 function hashLicenseKey(licenseKey) {
@@ -53,7 +54,7 @@ function utcDayKey() {
     return new Date().toISOString().slice(0, 10);
 }
 
-function estimateRequestTokens(messages, maxTokens) {
+function estimateInputTokens(messages) {
     let inputChars = 0;
     if (Array.isArray(messages)) {
         for (const message of messages) {
@@ -69,9 +70,20 @@ function estimateRequestTokens(messages, maxTokens) {
         }
     }
 
-    const estimatedInputTokens = Math.ceil(inputChars / 4);
-    const outputTokens = Math.min(MAX_OUTPUT_TOKENS, Math.max(1, Number(maxTokens) || MAX_OUTPUT_TOKENS));
-    return estimatedInputTokens + outputTokens;
+    return Math.ceil(inputChars / 4);
+}
+
+function estimateQuotaOutputTokens(maxTokens) {
+    const requested = Number(maxTokens);
+    const generationCeiling = Math.min(
+        MAX_OUTPUT_TOKENS,
+        Math.max(1, Number.isFinite(requested) && requested > 0 ? Math.floor(requested) : MAX_OUTPUT_TOKENS)
+    );
+    return Math.min(QUOTA_ESTIMATED_OUTPUT_TOKENS, generationCeiling);
+}
+
+function estimateRequestTokens(messages, maxTokens) {
+    return estimateInputTokens(messages) + estimateQuotaOutputTokens(maxTokens);
 }
 
 async function checkAndConsumeQuota({ licenseKey, messages, maxTokens }) {
@@ -133,6 +145,8 @@ async function checkAndConsumeQuota({ licenseKey, messages, maxTokens }) {
 
 module.exports = {
     hashLicenseKey,
+    estimateInputTokens,
+    estimateQuotaOutputTokens,
     estimateRequestTokens,
     checkAndConsumeQuota,
     getRedisConfig,

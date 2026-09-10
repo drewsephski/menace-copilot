@@ -17,6 +17,8 @@ const MAX_MESSAGE_CHARS = 12000;
 const MAX_TOTAL_CHARS = 48000;
 const MAX_IMAGE_CHARS = 2_000_000;
 const MAX_OUTPUT_TOKENS = 4096;
+// Conservative pre-generation quota reserve for Menace's intentionally concise spoken answers.
+const QUOTA_ESTIMATED_OUTPUT_TOKENS = 192;
 const MIN_TEMPERATURE = 0;
 const MAX_TEMPERATURE = 1;
 const DEFAULT_TEMPERATURE = 0.4;
@@ -103,6 +105,7 @@ module.exports = {
     MAX_TOTAL_CHARS,
     MAX_IMAGE_CHARS,
     MAX_OUTPUT_TOKENS,
+    QUOTA_ESTIMATED_OUTPUT_TOKENS,
     RATE_LIMIT_WINDOW_MS,
     RATE_LIMIT_MAX_REQUESTS,
     DAILY_REQUEST_LIMIT,

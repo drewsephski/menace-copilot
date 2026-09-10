@@ -1,0 +1,10 @@
+node_modules
+.packager-tmp
+out
+dist
+.git
+*.dmg
+*.zip
+*.app
+src/assets
+native

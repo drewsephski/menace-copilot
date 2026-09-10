@@ -20,6 +20,23 @@ function isIsoDateOrNull(value) {
     return /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
+const INSTRUCTION_SHAPED_PATTERNS = [
+    /\bignore\s+(all\s+)?(previous|prior|earlier)\s+instructions?\b/i,
+    /\bignore\s+(later|subsequent|future)\s+context\b/i,
+    /\breveal\s+(the\s+)?system\s+prompt\b/i,
+    /\b(always|never)\s+reveal\b.*\bpersonal\s+context\b/i,
+    /\boverride\s+(the\s+)?rules?\b/i,
+    /\bdisregard\s+(all\s+)?(previous|prior)\b/i,
+    /\byou\s+must\s+(always|never)\b/i,
+];
+
+function isInstructionShapedFact(fact) {
+    if (typeof fact !== 'string') {
+        return false;
+    }
+    return INSTRUCTION_SHAPED_PATTERNS.some(pattern => pattern.test(fact));
+}
+
 function normalizeConfidence(value) {
     if (typeof value !== 'string') {
         return { confidence: 'medium', warning: 'Missing confidence; treated as medium.' };
@@ -45,6 +62,11 @@ function normalizeFactEntry(raw, warnings) {
     const fact = raw.fact.trim();
     if (!fact) {
         warnings.push('Skipped an empty fact entry.');
+        return null;
+    }
+
+    if (isInstructionShapedFact(fact)) {
+        warnings.push(`Rejected instruction-shaped fact: "${fact.slice(0, 60)}${fact.length > 60 ? '...' : ''}"`);
         return null;
     }
 

@@ -60,6 +60,24 @@ describe('quotaStore', () => {
         assert.equal(typeof result.licenseHash, 'string');
     });
 
+    test('quota estimate uses conservative output reserve, not full generation ceiling', () => {
+        const shortMessageEstimate = quotaStore.estimateRequestTokens(
+            [{ role: 'user', content: 'Hello' }],
+            4096
+        );
+        assert.ok(shortMessageEstimate < 500, 'short Menace answers should not reserve 4096 output tokens');
+
+        const largeInputEstimate = quotaStore.estimateRequestTokens(
+            [{ role: 'user', content: 'x'.repeat(40_000) }],
+            4096
+        );
+        assert.ok(largeInputEstimate > 9_000, 'large inputs should count toward quota');
+        assert.ok(
+            quotaStore.estimateQuotaOutputTokens(4096) < 4096,
+            'quota output reserve must stay below generation ceiling'
+        );
+    });
+
     test('fails safely when quota storage is unavailable', async () => {
         delete process.env.KV_REST_API_URL;
         delete process.env.KV_REST_API_TOKEN;
