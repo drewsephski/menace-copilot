@@ -26,7 +26,8 @@
         "polar:sync": "node scripts/sync-polar-production.js --dry-run",
         "polar:sync:write": "node scripts/sync-polar-production.js --write",
         "polar:test-discount": "node scripts/create-polar-test-discount.js",
-        "test:license-flow": "node scripts/test-hosted-license-flow.js"
+        "test:license-flow": "node scripts/test-hosted-license-flow.js",
+        "gateway:dev": "cd site && vercel dev"
     },
     "keywords": [
         "menace agent",

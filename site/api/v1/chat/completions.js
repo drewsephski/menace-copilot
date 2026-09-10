@@ -1,14 +1,33 @@
 'use strict';
 
+const { Readable } = require('node:stream');
+const { pipeline } = require('node:stream/promises');
 const { extractBearerToken, validateLicenseKey } = require('../../../lib/polarLicense');
 const { validateChatRequest } = require('../../../lib/validateChatRequest');
 const { checkAndConsumeQuota } = require('../../../lib/quotaStore');
 
-function jsonError(status, message, extra = {}) {
-    return new Response(JSON.stringify({ error: { message, ...extra } }), {
-        status,
-        headers: { 'Content-Type': 'application/json' },
-    });
+function sendJson(res, status, message, extra = {}) {
+    res.statusCode = status;
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({ error: { message, ...extra } }));
+}
+
+async function parseJsonBody(req) {
+    if (req.body !== undefined && req.body !== null) {
+        if (typeof req.body === 'string') {
+            return req.body ? JSON.parse(req.body) : null;
+        }
+        return req.body;
+    }
+
+    const chunks = [];
+    for await (const chunk of req) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    }
+    if (chunks.length === 0) {
+        return null;
+    }
+    return JSON.parse(Buffer.concat(chunks).toString('utf8'));
 }
 
 async function proxyOpenRouter(payload) {
@@ -32,33 +51,38 @@ async function proxyOpenRouter(payload) {
     return response;
 }
 
-module.exports = async function handler(request) {
-    if (request.method !== 'POST') {
-        return jsonError(405, 'Method not allowed');
+module.exports = async (req, res) => {
+    if (req.method !== 'POST') {
+        sendJson(res, 405, 'Method not allowed');
+        return;
     }
 
-    const licenseKey = extractBearerToken(request.headers.get('authorization') || '');
+    const licenseKey = extractBearerToken(req.headers.authorization || '');
     if (!licenseKey) {
-        return jsonError(401, 'Missing license bearer token');
+        sendJson(res, 401, 'Missing license bearer token');
+        return;
     }
 
     let body;
     try {
-        body = await request.json();
+        body = await parseJsonBody(req);
     } catch {
-        return jsonError(400, 'Invalid JSON body');
+        sendJson(res, 400, 'Invalid JSON body');
+        return;
     }
 
     const validated = validateChatRequest(body);
     if (!validated.ok) {
-        return jsonError(validated.status, validated.error);
+        sendJson(res, validated.status, validated.error);
+        return;
     }
 
     try {
         await validateLicenseKey(licenseKey);
     } catch (error) {
         const status = error.status || 401;
-        return jsonError(status, error.message || 'License validation failed');
+        sendJson(res, status, error.message || 'License validation failed');
+        return;
     }
 
     const quota = await checkAndConsumeQuota({
@@ -72,7 +96,8 @@ module.exports = async function handler(request) {
             quota.reason === 'quota_storage_unavailable'
                 ? 'Hosted AI quota service unavailable'
                 : 'Rate or quota limit exceeded';
-        return jsonError(status, message, { retry_after: quota.retryAfterSec, reason: quota.reason });
+        sendJson(res, status, message, { retry_after: quota.retryAfterSec, reason: quota.reason });
+        return;
     }
 
     try {
@@ -80,20 +105,24 @@ module.exports = async function handler(request) {
         if (!upstream.ok) {
             const text = await upstream.text();
             const status = upstream.status >= 500 ? 502 : upstream.status;
-            return jsonError(status, `Upstream provider error (${upstream.status})`, {
+            sendJson(res, status, `Upstream provider error (${upstream.status})`, {
                 detail: text.slice(0, 200),
             });
+            return;
         }
 
-        const headers = new Headers({
-            'Content-Type': upstream.headers.get('content-type') || 'text/event-stream',
-            'Cache-Control': 'no-cache',
-            Connection: 'keep-alive',
-        });
+        res.statusCode = 200;
+        res.setHeader('Content-Type', upstream.headers.get('content-type') || 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
 
-        return new Response(upstream.body, { status: 200, headers });
+        if (upstream.body) {
+            await pipeline(Readable.fromWeb(upstream.body), res);
+        } else {
+            res.end();
+        }
     } catch (error) {
         const status = error.status || 500;
-        return jsonError(status, error.message || 'Hosted AI gateway failed');
+        sendJson(res, status, error.message || 'Hosted AI gateway failed');
     }
 };

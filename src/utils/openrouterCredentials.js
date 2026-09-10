@@ -22,7 +22,12 @@ function syncLicensedHostedAccess(licenseStatus) {
 
 function getUserOpenRouterApiKey() {
     const key = storage.getOpenRouterApiKey();
-    return key && key.trim() ? key.trim() : '';
+    if (key && key.trim()) {
+        return key.trim();
+    }
+
+    const envKey = process.env.OPENROUTER_API_KEY;
+    return envKey && envKey.trim() ? envKey.trim() : '';
 }
 
 function isHostedOpenRouterConfigured() {

@@ -48,6 +48,11 @@ async function streamHostedChatCompletion({ model, messages, onToken, temperatur
 
     if (!response.ok) {
         const errorText = await response.text();
+        if (response.status === 404) {
+            throw new Error(
+                'Included AI gateway is unavailable (404). Add an OpenRouter API key on the home screen, or retry after the service is updated.'
+            );
+        }
         throw new Error(`Hosted AI gateway error ${response.status}: ${errorText.slice(0, 200)}`);
     }
 
