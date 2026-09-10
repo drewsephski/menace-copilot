@@ -356,23 +356,68 @@ export class AssistantView extends LitElement {
             : `Listening to your ${profileNames[this.selectedProfile] || 'session'}...`;
     }
 
+    prepareMarkdownContent(content) {
+        if (!content || typeof content !== 'string') {
+            return '';
+        }
+
+        let text = content;
+
+        // Normalize spaced bold markers so "** word **" still renders as bold.
+        text = text.replace(/\*\*\s+([^*\n]+?)\s+\*\*/g, '**$1**');
+
+        // During streaming, close an unclosed "**" so partial bold does not show literally.
+        const boldMarkerCount = (text.match(/\*\*/g) || []).length;
+        if (boldMarkerCount % 2 === 1) {
+            text += '**';
+        }
+
+        return text;
+    }
+
+    cleanupRenderedHtml(html) {
+        const parts = html.split(/(<pre[\s\S]*?<\/pre>|<code[\s\S]*?<\/code>)/gi);
+
+        return parts
+            .map((part, index) => {
+                if (index % 2 === 1) {
+                    return part;
+                }
+
+                return part.replace(/\*\*([^*<\n]+?)\*\*/g, '<strong>$1</strong>').replace(/\*\*/g, '');
+            })
+            .join('');
+    }
+
+    fallbackFormatMarkdown(content) {
+        const prepared = this.prepareMarkdownContent(content);
+
+        return prepared
+            .replace(/\*\*([^*\n]+?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*\*/g, '')
+            .replace(/\n/g, '<br>');
+    }
+
     renderMarkdown(content) {
+        const prepared = this.prepareMarkdownContent(content);
+
         if (typeof window !== 'undefined' && window.marked) {
             try {
                 window.marked.setOptions({
                     breaks: true,
                     gfm: true,
-                    sanitize: false,
                 });
-                let rendered = window.marked.parse(content);
+                let rendered = window.marked.parse(prepared);
+                rendered = this.cleanupRenderedHtml(rendered);
                 rendered = this.wrapWordsInSpans(rendered);
                 return rendered;
             } catch (error) {
                 console.warn('Error parsing markdown:', error);
-                return content;
+                return this.fallbackFormatMarkdown(content);
             }
         }
-        return content;
+
+        return this.fallbackFormatMarkdown(content);
     }
 
     wrapWordsInSpans(html) {
