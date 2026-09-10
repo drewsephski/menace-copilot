@@ -11,13 +11,17 @@ export const unifiedPageStyles = css`
     :host {
         display: block;
         height: 100%;
+        min-height: 0;
     }
 
     .unified-page {
         height: 100%;
+        min-height: 0;
         overflow-y: auto;
+        overflow-x: hidden;
         padding: var(--space-lg);
         background: var(--bg-app);
+        overscroll-behavior: contain;
     }
 
     .unified-wrap {
@@ -28,6 +32,7 @@ export const unifiedPageStyles = css`
         flex-direction: column;
         gap: var(--space-md);
         min-height: 100%;
+        min-width: 0;
     }
 
     .page-title {
@@ -44,7 +49,7 @@ export const unifiedPageStyles = css`
 
     .surface {
         border: 1px solid var(--border);
-        border-radius: var(--radius-md);
+        border-radius: var(--radius-sm);
         background: var(--bg-surface);
         padding: var(--space-md);
     }
@@ -79,6 +84,7 @@ export const unifiedPageStyles = css`
         align-items: center;
         justify-content: space-between;
         gap: var(--space-md);
+        min-width: 0;
     }
 
     .form-group.vertical {
@@ -89,7 +95,6 @@ export const unifiedPageStyles = css`
     .form-label {
         color: var(--text-secondary);
         font-size: var(--font-size-sm);
-        white-space: nowrap;
         flex-shrink: 0;
     }
 
@@ -107,11 +112,13 @@ export const unifiedPageStyles = css`
         border-radius: var(--radius-sm);
         padding: 8px 12px;
         font-size: var(--font-size-sm);
-        transition: border-color var(--transition), box-shadow var(--transition);
+        transition:
+            border-color var(--transition),
+            box-shadow var(--transition);
     }
 
     .control:hover:not(:focus) {
-        border-color: var(--border-strong);
+        border-color: var(--border);
     }
 
     .control:focus {
@@ -150,7 +157,7 @@ export const unifiedPageStyles = css`
 
     .pill {
         border: 1px solid var(--border);
-        border-radius: 999px;
+        border-radius: var(--radius-sm);
         padding: 2px 8px;
         font-size: var(--font-size-xs);
         color: var(--text-muted);
@@ -164,7 +171,22 @@ export const unifiedPageStyles = css`
         color: var(--danger);
     }
 
-    @media (max-width: 640px) {
+    @media (max-width: 720px) {
+        .unified-page {
+            padding: var(--space-md);
+        }
+
+        .form-group:not(.vertical) {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .control {
+            width: 100%;
+        }
+    }
+
+    @media (max-height: 560px) {
         .unified-page {
             padding: var(--space-md);
         }

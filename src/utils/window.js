@@ -5,7 +5,49 @@ const storage = require('../storage');
 let mouseEventsIgnored = false;
 
 const DEFAULT_MAIN_WINDOW_SIZE = { width: 1100, height: 800 };
+const LIVE_WINDOW_SIZE = { width: 520, height: 400 };
 const MIN_WINDOW_SIZE = { width: 700, height: 320 };
+const MIN_LIVE_WINDOW_SIZE = { width: 360, height: 220 };
+
+function shouldUseMacScreenPicker() {
+    if (process.platform !== 'darwin') {
+        return false;
+    }
+
+    try {
+        const { systemPreferences } = require('electron');
+        if (systemPreferences.getMediaAccessStatus('screen') === 'granted') {
+            return false;
+        }
+
+        const config = storage.getConfig();
+        return !config.onboarded;
+    } catch (error) {
+        console.warn('Unable to determine macOS screen picker preference:', error.message);
+        return false;
+    }
+}
+
+function configureDisplayMediaHandler() {
+    const { session, desktopCapturer } = require('electron');
+
+    session.defaultSession.setDisplayMediaRequestHandler(
+        (request, callback) => {
+            desktopCapturer
+                .getSources({ types: ['screen'] })
+                .then(sources => {
+                    if (!sources.length) {
+                        callback({});
+                        return;
+                    }
+
+                    callback({ video: sources[0], audio: 'loopback' });
+                })
+                .catch(() => callback({}));
+        },
+        { useSystemPicker: shouldUseMacScreenPicker() }
+    );
+}
 
 function createWindow(sendToRenderer, geminiSessionRef) {
     let windowWidth = DEFAULT_MAIN_WINDOW_SIZE.width;
@@ -32,15 +74,7 @@ function createWindow(sendToRenderer, geminiSessionRef) {
         backgroundColor: '#00000000',
     });
 
-    const { session, desktopCapturer } = require('electron');
-    session.defaultSession.setDisplayMediaRequestHandler(
-        (request, callback) => {
-            desktopCapturer.getSources({ types: ['screen'] }).then(sources => {
-                callback({ video: sources[0], audio: 'loopback' });
-            });
-        },
-        { useSystemPicker: true }
-    );
+    configureDisplayMediaHandler();
 
     mainWindow.setContentProtection(true);
     if (process.platform === 'win32') {
@@ -302,8 +336,20 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
                 mainWindow.setVisibleOnAllWorkspaces(isLiveMode, { visibleOnFullScreen: isLiveMode });
             }
 
-            if (!isLiveMode) {
+            if (isLiveMode) {
+                // Collapse into a compact prompter overlay for the live interview.
+                const [currentX, currentY] = mainWindow.getPosition();
+                mainWindow.setMinimumSize(MIN_LIVE_WINDOW_SIZE.width, MIN_LIVE_WINDOW_SIZE.height);
+                mainWindow.setSize(LIVE_WINDOW_SIZE.width, LIVE_WINDOW_SIZE.height, true);
+                const display = screen.getDisplayMatching(mainWindow.getBounds());
+                const work = display.workArea;
+                const nextX = Math.min(currentX, work.x + work.width - LIVE_WINDOW_SIZE.width - 24);
+                const nextY = Math.max(work.y + 24, Math.min(currentY, work.y + work.height - LIVE_WINDOW_SIZE.height - 24));
+                mainWindow.setPosition(Math.max(work.x + 24, nextX), nextY);
+            } else {
                 mainWindow.setIgnoreMouseEvents(false);
+                mainWindow.setMinimumSize(MIN_WINDOW_SIZE.width, MIN_WINDOW_SIZE.height);
+                mainWindow.setSize(DEFAULT_MAIN_WINDOW_SIZE.width, DEFAULT_MAIN_WINDOW_SIZE.height, true);
             }
         }
     });
@@ -317,6 +363,16 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
     ipcMain.on('update-keybinds', (event, newKeybinds) => {
         if (!mainWindow.isDestroyed()) {
             updateGlobalShortcuts(newKeybinds, mainWindow, sendToRenderer, geminiSessionRef);
+        }
+    });
+
+    ipcMain.handle('refresh-display-media-handler', async () => {
+        try {
+            configureDisplayMediaHandler();
+            return { success: true };
+        } catch (error) {
+            console.error('Error refreshing display media handler:', error);
+            return { success: false, error: error.message };
         }
     });
 
@@ -341,6 +397,7 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
 
 module.exports = {
     createWindow,
+    configureDisplayMediaHandler,
     getDefaultKeybinds,
     updateGlobalShortcuts,
     setupWindowIpcHandlers,

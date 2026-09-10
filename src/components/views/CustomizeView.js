@@ -18,7 +18,7 @@ export class CustomizeView extends LitElement {
                 color: var(--danger);
                 font-size: var(--font-size-xs);
                 line-height: 1.4;
-                background: rgba(239, 68, 68, 0.06);
+                background: var(--tally-dim);
             }
 
             .warning-callout::before {
@@ -87,7 +87,7 @@ export class CustomizeView extends LitElement {
                 appearance: none;
                 width: 100%;
                 height: 4px;
-                border-radius: 2px;
+                border-radius: var(--radius-sm);
                 background: var(--border);
                 outline: none;
                 cursor: pointer;
@@ -115,6 +115,8 @@ export class CustomizeView extends LitElement {
                 display: flex;
                 align-items: center;
                 justify-content: space-between;
+                gap: var(--space-sm);
+                flex-wrap: wrap;
                 padding: var(--space-sm) 0;
                 border-bottom: 1px solid var(--border);
             }
@@ -140,14 +142,14 @@ export class CustomizeView extends LitElement {
                 color: var(--danger);
                 background: transparent;
                 border-radius: var(--radius-sm);
-                padding: 9px 12px;
+                padding: 8px 12px;
                 font-size: var(--font-size-sm);
                 cursor: pointer;
                 transition: background var(--transition);
             }
 
             .danger-button:hover {
-                background: rgba(241, 76, 76, 0.11);
+                background: var(--tally-dim);
             }
 
             .danger-button:disabled {
@@ -580,9 +582,13 @@ export class CustomizeView extends LitElement {
                             <option value="both">Both Speaker and Microphone</option>
                         </select>
                     </div>
-                    ${this.audioMode !== 'speaker_only' ? html`
-                        <div class="warning-callout">May cause unexpected behavior. Only change this if you know what you're doing.</div>
-                    ` : ''}
+                    ${
+                        this.audioMode !== 'speaker_only'
+                            ? html`
+                                  <div class="warning-callout">May cause unexpected behavior. Only change this if you know what you're doing.</div>
+                              `
+                            : ''
+                    }
                     <div class="form-group">
                         <label class="form-label">Image Quality</label>
                         <select class="control" .value=${this.selectedImageQuality} @change=${this.handleImageQualitySelect}>
@@ -662,20 +668,22 @@ export class CustomizeView extends LitElement {
         return html`
             <section class="surface">
                 <div class="surface-title">Keyboard Shortcuts</div>
-                ${this.getKeybindActions().map(action => html`
-                    <div class="keybind-row">
-                        <span class="keybind-name">${action.name}</span>
-                        <input
-                            type="text"
-                            class="control keybind-input"
-                            .value=${this.keybinds[action.key]}
-                            data-action=${action.key}
-                            @keydown=${this.handleKeybindInput}
-                            @focus=${this.handleKeybindFocus}
-                            readonly
-                        />
-                    </div>
-                `)}
+                ${this.getKeybindActions().map(
+                    action => html`
+                        <div class="keybind-row">
+                            <span class="keybind-name">${action.name}</span>
+                            <input
+                                type="text"
+                                class="control keybind-input"
+                                .value=${this.keybinds[action.key]}
+                                data-action=${action.key}
+                                @keydown=${this.handleKeybindInput}
+                                @focus=${this.handleKeybindFocus}
+                                readonly
+                            />
+                        </div>
+                    `
+                )}
                 <div style="margin-top: var(--space-sm);">
                     <button class="control" style="width:auto;padding:8px 10px;" @click=${this.resetKeybinds}>Reset to defaults</button>
                 </div>
@@ -695,9 +703,11 @@ export class CustomizeView extends LitElement {
                         ${this.isClearing ? 'Clearing...' : 'Delete all data'}
                     </button>
                 </div>
-                ${this.clearStatusMessage ? html`
-                    <div class="status ${this.clearStatusType === 'success' ? 'success' : 'error'}">${this.clearStatusMessage}</div>
-                ` : ''}
+                ${
+                    this.clearStatusMessage
+                        ? html` <div class="status ${this.clearStatusType === 'success' ? 'success' : 'error'}">${this.clearStatusMessage}</div> `
+                        : ''
+                }
             </section>
         `;
     }
@@ -707,10 +717,7 @@ export class CustomizeView extends LitElement {
             <div class="unified-page">
                 <div class="unified-wrap">
                     <div class="page-title">Settings</div>
-                    ${this.renderAudioSection()}
-                    ${this.renderLanguageSection()}
-                    ${this.renderAppearanceSection()}
-                    ${this.renderKeyboardSection()}
+                    ${this.renderAudioSection()} ${this.renderLanguageSection()} ${this.renderAppearanceSection()} ${this.renderKeyboardSection()}
                     ${this.renderPrivacySection()}
                 </div>
             </div>

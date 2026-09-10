@@ -10,19 +10,20 @@ const DEFAULT_CONFIG = {
     onboarded: false,
     layout: 'normal',
     geminiLiveModel: 'gemini-3.1-flash-live-preview',
-    groqModel: 'qwen/qwen3.6-27b',
-    groqImageModel: 'qwen/qwen3.6-27b',
-    disableGroqThinking: true,
+    openrouterModel: 'google/gemini-3.5-flash-lite',
 };
 
 const DEFAULT_CREDENTIALS = {
     apiKey: '',
-    groqApiKey: '',
+    openrouterApiKey: '',
+    licenseKey: '',
+    licenseActivationId: '',
+    licenseValidatedAt: 0,
 };
 
 const DEFAULT_PREFERENCES = {
     customPrompt: '',
-    providerMode: 'byok',
+    providerMode: 'whisper_openrouter',
     selectedProfile: 'interview',
     selectedLanguage: 'en-US',
     selectedScreenshotInterval: '5',
@@ -33,26 +34,39 @@ const DEFAULT_PREFERENCES = {
     backgroundTransparency: 0.8,
     googleSearchEnabled: false,
     localLlmModel: 'unsloth/Qwen3.5-4B-GGUF:Q4_K_M',
-    whisperModel: 'tiny.en',
+    whisperModel: 'base.en',
 };
 
 const DEFAULT_KEYBINDS = null; // null means use system defaults
 
 const DEFAULT_LIMITS = {
-    data: [], // Array of { date: 'YYYY-MM-DD', flash: { count }, flashLite: { count }, groq: { 'qwen3-32b': { chars, limit }, 'gpt-oss-120b': { chars, limit }, 'gpt-oss-20b': { chars, limit } }, gemini: { 'gemma-4-26b-a4b-it': { chars } } }
+    data: [], // Array of { date: 'YYYY-MM-DD', flash: { count }, flashLite: { count }, openrouter: { [model]: { chars } }, gemini: { 'gemma-4-26b-a4b-it': { chars } } }
 };
 
 // Get the config directory path based on OS
 function getConfigDir() {
     const platform = os.platform();
-    let configDir;
+    let base;
 
     if (platform === 'win32') {
-        configDir = path.join(os.homedir(), 'AppData', 'Roaming', 'cheating-daddy-config');
+        base = path.join(os.homedir(), 'AppData', 'Roaming');
     } else if (platform === 'darwin') {
-        configDir = path.join(os.homedir(), 'Library', 'Application Support', 'cheating-daddy-config');
+        base = path.join(os.homedir(), 'Library', 'Application Support');
     } else {
-        configDir = path.join(os.homedir(), '.config', 'cheating-daddy-config');
+        base = path.join(os.homedir(), '.config');
+    }
+
+    const configDir = path.join(base, 'menace-agent-config');
+    const legacyDir = path.join(base, 'cheating-daddy-config');
+
+    // One-time migrate from the previous product identity when present.
+    if (!fs.existsSync(configDir) && fs.existsSync(legacyDir)) {
+        try {
+            fs.cpSync(legacyDir, configDir, { recursive: true });
+            console.log('Migrated config from cheating-daddy-config to menace-agent-config');
+        } catch (error) {
+            console.warn('Config migration failed:', error.message);
+        }
     }
 
     return configDir;
@@ -149,6 +163,38 @@ function resetConfigDir() {
     console.log('Config directory initialized with defaults');
 }
 
+const LEGACY_OPENROUTER_MODELS = new Set(['google/gemini-2.5-flash', 'google/gemini-2.5-flash-lite']);
+
+function migrateOpenRouterDefaults() {
+    const saved = readJsonFile(getConfigPath(), {});
+    if (saved.openrouterDefaultsV2) {
+        return;
+    }
+
+    const next = { ...saved };
+    if (!next.openrouterModel || next.openrouterModel === 'google/gemini-2.5-flash') {
+        next.openrouterModel = DEFAULT_CONFIG.openrouterModel;
+    }
+    delete next.disableOpenRouterThinking;
+    delete next.disableGroqThinking;
+    next.openrouterDefaultsV2 = true;
+    writeJsonFile(getConfigPath(), next);
+}
+
+function migrateOpenRouterFlashDefaults() {
+    const saved = readJsonFile(getConfigPath(), {});
+    if (saved.openrouterDefaultsV3) {
+        return;
+    }
+
+    const next = { ...saved };
+    if (!next.openrouterModel || LEGACY_OPENROUTER_MODELS.has(next.openrouterModel)) {
+        next.openrouterModel = DEFAULT_CONFIG.openrouterModel;
+    }
+    next.openrouterDefaultsV3 = true;
+    writeJsonFile(getConfigPath(), next);
+}
+
 // Initialize storage - call this on app startup
 function initializeStorage() {
     if (needsReset()) {
@@ -159,6 +205,8 @@ function initializeStorage() {
         if (!fs.existsSync(historyDir)) {
             fs.mkdirSync(historyDir, { recursive: true });
         }
+        migrateOpenRouterDefaults();
+        migrateOpenRouterFlashDefaults();
     }
 }
 
@@ -166,7 +214,19 @@ function initializeStorage() {
 
 function getConfig() {
     const saved = readJsonFile(getConfigPath(), {});
-    return { ...DEFAULT_CONFIG, ...saved };
+    const {
+        groqModel,
+        groqImageModel: _groqImageModel,
+        disableGroqThinking: _disableGroqThinking,
+        disableOpenRouterThinking: _disableOpenRouterThinking,
+        ...rest
+    } = saved;
+
+    return {
+        ...DEFAULT_CONFIG,
+        ...rest,
+        openrouterModel: rest.openrouterModel || groqModel || DEFAULT_CONFIG.openrouterModel,
+    };
 }
 
 function setConfig(config) {
@@ -201,12 +261,38 @@ function setApiKey(apiKey) {
     return setCredentials({ apiKey });
 }
 
-function getGroqApiKey() {
-    return getCredentials().groqApiKey || '';
+function getOpenRouterApiKey() {
+    return getCredentials().openrouterApiKey || '';
 }
 
-function setGroqApiKey(groqApiKey) {
-    return setCredentials({ groqApiKey });
+function setOpenRouterApiKey(openrouterApiKey) {
+    return setCredentials({ openrouterApiKey });
+}
+
+function getLicense() {
+    const creds = getCredentials();
+    return {
+        key: typeof creds.licenseKey === 'string' ? creds.licenseKey : '',
+        activationId: typeof creds.licenseActivationId === 'string' ? creds.licenseActivationId : '',
+        validatedAt: Number.isFinite(creds.licenseValidatedAt) ? creds.licenseValidatedAt : 0,
+    };
+}
+
+function setLicense({ key, activationId, validatedAt }) {
+    const current = getLicense();
+    return setCredentials({
+        licenseKey: key === undefined ? current.key : key,
+        licenseActivationId: activationId === undefined ? current.activationId : activationId,
+        licenseValidatedAt: validatedAt === undefined ? current.validatedAt : validatedAt,
+    });
+}
+
+function clearLicense() {
+    return setCredentials({
+        licenseKey: '',
+        licenseActivationId: '',
+        licenseValidatedAt: 0,
+    });
 }
 
 // ============ PREFERENCES ============
@@ -278,6 +364,9 @@ function getTodayLimits() {
                 'kimi-k2-instruct': { chars: 0, limit: 600000 },
             };
         }
+        if (!todayEntry.openrouter) {
+            todayEntry.openrouter = {};
+        }
         if (!todayEntry.gemini) {
             todayEntry.gemini = {
                 'gemma-4-26b-a4b-it': { chars: 0 },
@@ -299,6 +388,7 @@ function getTodayLimits() {
             'gpt-oss-20b': { chars: 0, limit: 600000 },
             'kimi-k2-instruct': { chars: 0, limit: 600000 },
         },
+        openrouter: {},
         gemini: {
             'gemma-4-26b-a4b-it': { chars: 0 },
         },
@@ -331,9 +421,9 @@ function incrementLimitCount(model) {
     }
 
     // Increment the appropriate model count
-    if (model === 'gemini-2.5-flash') {
+    if (model === 'gemini-3.6-flash' || model === 'gemini-2.5-flash') {
         todayEntry.flash.count++;
-    } else if (model === 'gemini-2.5-flash-lite') {
+    } else if (model === 'gemini-3.5-flash-lite' || model === 'gemini-2.5-flash-lite') {
         todayEntry.flashLite.count++;
     }
 
@@ -348,10 +438,15 @@ function incrementCharUsage(provider, model, charCount) {
     const today = getTodayDateString();
     const todayEntry = limits.data.find(entry => entry.date === today);
 
-    if (todayEntry[provider] && todayEntry[provider][model]) {
-        todayEntry[provider][model].chars += charCount;
-        setLimits(limits);
+    if (!todayEntry[provider]) {
+        todayEntry[provider] = {};
     }
+    if (!todayEntry[provider][model]) {
+        todayEntry[provider][model] = { chars: 0 };
+    }
+
+    todayEntry[provider][model].chars += charCount;
+    setLimits(limits);
 
     return todayEntry;
 }
@@ -361,13 +456,14 @@ function getAvailableModel() {
 
     // RPD limits: flash = 20, flash-lite = 20
     // After both exhausted, fall back to flash (for paid API users)
+    // gemini-2.5-flash is retired for new users — use 3.6 / 3.5-lite.
     if (todayLimits.flash.count < 20) {
-        return 'gemini-2.5-flash';
+        return 'gemini-3.6-flash';
     } else if (todayLimits.flashLite.count < 20) {
-        return 'gemini-2.5-flash-lite';
+        return 'gemini-3.5-flash-lite';
     }
 
-    return 'gemini-2.5-flash'; // Default to flash for paid API users
+    return 'gemini-3.6-flash'; // Default to flash for paid API users
 }
 
 function getModelForToday() {
@@ -511,8 +607,11 @@ module.exports = {
     setCredentials,
     getApiKey,
     setApiKey,
-    getGroqApiKey,
-    setGroqApiKey,
+    getOpenRouterApiKey,
+    setOpenRouterApiKey,
+    getLicense,
+    setLicense,
+    clearLicense,
 
     // Preferences
     getPreferences,

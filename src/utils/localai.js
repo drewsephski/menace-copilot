@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { getSystemPrompt } = require('./prompts');
-const { sendToRenderer, initializeNewSession, saveConversationTurn } = require('./gemini');
+const { sendToRenderer, initializeNewSession, saveConversationTurn, sendToOpenRouter } = require('./gemini');
 const {
     ensureNativeBinary,
     ensureLlamaModel,
@@ -28,16 +28,67 @@ let isSpeaking = false;
 let speechBuffers = [];
 let silenceFrameCount = 0;
 let speechFrameCount = 0;
+// 'llama' = fully local answers; 'openrouter' = Whisper STT + OpenRouter answers
+let answerBackend = 'llama';
+let isGeneratingAnswer = false;
 
 const VAD_MODES = {
     NORMAL: { energyThreshold: 0.01, speechFramesRequired: 3, silenceFramesRequired: 30 },
     LOW_BITRATE: { energyThreshold: 0.008, speechFramesRequired: 4, silenceFramesRequired: 35 },
     AGGRESSIVE: { energyThreshold: 0.015, speechFramesRequired: 2, silenceFramesRequired: 20 },
-    VERY_AGGRESSIVE: { energyThreshold: 0.02, speechFramesRequired: 2, silenceFramesRequired: 15 },
+    // Slightly stricter than before: tiny Whisper models invent phrases on low-energy noise.
+    VERY_AGGRESSIVE: { energyThreshold: 0.028, speechFramesRequired: 4, silenceFramesRequired: 18 },
 };
+
+// Common Whisper hallucinations (especially tiny.en) on silence / UI noise / music.
+const WHISPER_HALLUCINATION_PATTERNS = [
+    /^tell me about yourself\.?$/i,
+    /^thanks for watching\.?$/i,
+    /^thank you for watching\.?$/i,
+    /^thank you\.?$/i,
+    /^thanks\.?$/i,
+    /^please subscribe\.?$/i,
+    /^subscribe to (my|the) channel\.?$/i,
+    /^like and subscribe\.?$/i,
+    /^\[?\s*(music|applause|silence|blank_audio|inaudible)\s*\]?$/i,
+    /^(you|the end|goodbye|bye)\.?$/i,
+    /^\.+$/,
+];
+
+// Exact example lines from the interview system prompt — never treat as live audio.
+const PROMPT_EXAMPLE_PHRASES = [
+    'tell me about yourself',
+    "what's your experience with react?",
+    'why do you want to work here?',
+];
 
 let vadConfig = VAD_MODES.VERY_AGGRESSIVE;
 let resampleRemainder = Buffer.alloc(0);
+let lastAcceptedTranscription = '';
+let lastAcceptedAt = 0;
+
+function normalizeTranscription(text) {
+    return (text || '')
+        .trim()
+        .toLowerCase()
+        .replace(/[“”]/g, '"')
+        .replace(/\s+/g, ' ');
+}
+
+function isHallucinatedTranscription(text) {
+    const normalized = normalizeTranscription(text);
+    if (!normalized || normalized.length < 3) return true;
+    if (WHISPER_HALLUCINATION_PATTERNS.some(pattern => pattern.test(normalized))) return true;
+    if (PROMPT_EXAMPLE_PHRASES.includes(normalized.replace(/["']/g, ''))) return true;
+
+    // Reject near-instant repeats of the same line (common with tiny Whisper loops).
+    const now = Date.now();
+    if (normalized === lastAcceptedTranscription && now - lastAcceptedAt < 15000) {
+        return true;
+    }
+
+    return false;
+}
 
 function resample24kTo16k(inputBuffer) {
     const combined = Buffer.concat([resampleRemainder, inputBuffer]);
@@ -160,8 +211,16 @@ async function transcribeAudio(pcm16kBuffer) {
 async function handleSpeechEnd(audioData) {
     if (!isLocalActive) return;
 
-    if (audioData.length < 16000) {
+    // Require ~0.75s of 16 kHz mono PCM before asking Whisper (cuts silence hallucinations).
+    if (audioData.length < 24000) {
         console.log('[LocalAI] Audio too short, skipping');
+        sendToRenderer('update-status', 'Listening...');
+        return;
+    }
+
+    const segmentRms = calculateRms(audioData);
+    if (segmentRms < vadConfig.energyThreshold * 0.85) {
+        console.log('[LocalAI] Segment energy too low, skipping (RMS:', segmentRms.toFixed(4), ')');
         sendToRenderer('update-status', 'Listening...');
         return;
     }
@@ -175,9 +234,35 @@ async function handleSpeechEnd(audioData) {
             return;
         }
 
+        if (isHallucinatedTranscription(transcription)) {
+            console.log('[LocalAI] Ignoring hallucinated / example transcription:', transcription);
+            sendToRenderer('update-status', 'Listening...');
+            return;
+        }
+
+        lastAcceptedTranscription = normalizeTranscription(transcription);
+        lastAcceptedAt = Date.now();
+
+        if (isGeneratingAnswer) {
+            console.log('[LocalAI] Skipping transcription while answer is generating:', transcription);
+            sendToRenderer('update-status', 'Generating response...');
+            return;
+        }
+
+        isGeneratingAnswer = true;
         sendToRenderer('update-status', 'Generating response...');
-        await sendToLlama(transcription);
+        try {
+            if (answerBackend === 'openrouter') {
+                console.log('[LocalAI] Routing transcription to OpenRouter:', transcription);
+                await sendToOpenRouter(transcription);
+            } else {
+                await sendToLlama(transcription);
+            }
+        } finally {
+            isGeneratingAnswer = false;
+        }
     } catch (error) {
+        isGeneratingAnswer = false;
         console.error('[LocalAI] Transcription error:', error);
         sendToRenderer('update-status', 'Transcription error: ' + error.message);
     }
@@ -324,14 +409,11 @@ function removeNewLlamaCacheEntries() {
     }
 }
 
-async function prepareNativeFiles(llamaModelReference, whisperModel, signal) {
+async function prepareWhisperFiles(whisperModel, signal) {
     const binaryProgress = label => progress => {
         sendToRenderer('update-status', formatDownloadStatus(label, progress));
         sendDownloadProgress(label, progress);
     };
-
-    sendDownloadProgress('Checking Llama runner');
-    const llamaBinaryPath = await ensureNativeBinary('llama', binaryProgress('Llama runner'), signal);
 
     sendDownloadProgress('Checking Whisper runner');
     const whisperBinaryPath = await ensureNativeBinary('whisper', binaryProgress('Whisper runner'), signal);
@@ -345,12 +427,26 @@ async function prepareNativeFiles(llamaModelReference, whisperModel, signal) {
         sendToRenderer('whisper-downloading', false);
     }
 
+    return { whisperBinaryPath, whisperModelPath };
+}
+
+async function prepareNativeFiles(llamaModelReference, whisperModel, signal) {
+    const binaryProgress = label => progress => {
+        sendToRenderer('update-status', formatDownloadStatus(label, progress));
+        sendDownloadProgress(label, progress);
+    };
+
+    sendDownloadProgress('Checking Llama runner');
+    const llamaBinaryPath = await ensureNativeBinary('llama', binaryProgress('Llama runner'), signal);
+
+    const whisperFiles = await prepareWhisperFiles(whisperModel, signal);
+
     sendDownloadProgress('Checking language model');
     const llamaFiles = await ensureLlamaModel(llamaModelReference, binaryProgress('Language model'), binaryProgress('Vision model'), signal);
     return {
         llamaBinaryPath,
-        whisperBinaryPath,
-        whisperModelPath,
+        whisperBinaryPath: whisperFiles.whisperBinaryPath,
+        whisperModelPath: whisperFiles.whisperModelPath,
         llamaModelPath: llamaFiles.modelPath,
         projectorPath: llamaFiles.projectorPath,
     };
@@ -422,12 +518,24 @@ async function startLlamaServer(executablePath, modelPath, projectorPath) {
     await waitForServer(`${llamaBaseUrl}/health`, llamaProcess, 30 * 60 * 1000);
 }
 
+function resetSpeechState() {
+    isSpeaking = false;
+    speechBuffers = [];
+    silenceFrameCount = 0;
+    speechFrameCount = 0;
+    resampleRemainder = Buffer.alloc(0);
+    isGeneratingAnswer = false;
+    lastAcceptedTranscription = '';
+    lastAcceptedAt = 0;
+}
+
 async function initializeLocalSession(model, whisperModel, profile, customPrompt) {
     console.log('[LocalAI] Initializing native local session:', { model, whisperModel, profile });
     sendToRenderer('session-initializing', true);
 
     try {
         closeLocalSession();
+        answerBackend = 'llama';
         initializationController = new AbortController();
         llamaCacheSnapshot = getDirectoryEntries(path.join(getModelsDirectory(), 'llama'));
         currentSystemPrompt = getSystemPrompt(profile, customPrompt, false);
@@ -444,11 +552,7 @@ async function initializeLocalSession(model, whisperModel, profile, customPrompt
         sendDownloadProgress('Loading language model');
         await startLlamaServer(nativeFiles.llamaBinaryPath, nativeFiles.llamaModelPath, nativeFiles.projectorPath);
 
-        isSpeaking = false;
-        speechBuffers = [];
-        silenceFrameCount = 0;
-        speechFrameCount = 0;
-        resampleRemainder = Buffer.alloc(0);
+        resetSpeechState();
         localConversationHistory = [];
 
         initializeNewSession(profile, customPrompt);
@@ -477,6 +581,57 @@ async function initializeLocalSession(model, whisperModel, profile, customPrompt
     }
 }
 
+async function initializeWhisperOpenRouterSession(whisperModel, profile, customPrompt) {
+    console.log('[LocalAI] Initializing Whisper + OpenRouter session:', { whisperModel, profile });
+    sendToRenderer('session-initializing', true);
+
+    try {
+        closeLocalSession();
+        answerBackend = 'openrouter';
+        initializationController = new AbortController();
+        currentSystemPrompt = getSystemPrompt(profile, customPrompt, false);
+
+        const whisperFiles = await prepareWhisperFiles(whisperModel, initializationController.signal);
+        if (!whisperFiles.whisperBinaryPath || !fs.existsSync(whisperFiles.whisperBinaryPath)) {
+            throw new Error(`Whisper runner path is invalid: ${whisperFiles.whisperBinaryPath}`);
+        }
+        if (!whisperFiles.whisperModelPath || !fs.existsSync(whisperFiles.whisperModelPath)) {
+            throw new Error(`Whisper model path is invalid: ${whisperFiles.whisperModelPath}`);
+        }
+
+        sendToRenderer('update-status', 'Starting Whisper...');
+        sendDownloadProgress('Starting Whisper');
+        await startWhisperServer(whisperFiles.whisperBinaryPath, whisperFiles.whisperModelPath);
+
+        resetSpeechState();
+        localConversationHistory = [];
+
+        initializeNewSession(profile, customPrompt);
+        isLocalActive = true;
+        initializationController = null;
+        sendToRenderer('local-ai-download-progress', { active: false });
+        sendToRenderer('session-initializing', false);
+        sendToRenderer('update-status', 'Whisper + OpenRouter ready - Listening...');
+        console.log('[LocalAI] Whisper + OpenRouter session initialized successfully');
+        return true;
+    } catch (error) {
+        const wasCancelled = error.name === 'AbortError' || initializationController?.signal.aborted;
+        if (wasCancelled) {
+            console.log('[LocalAI] Whisper + OpenRouter initialization cancelled');
+        } else {
+            console.error('[LocalAI] Whisper + OpenRouter initialization error:', error);
+        }
+        closeLocalSession();
+        sendToRenderer('local-ai-download-progress', { active: false });
+        sendToRenderer('session-initializing', false);
+        sendToRenderer(
+            'update-status',
+            wasCancelled ? 'Whisper download cancelled' : 'Whisper + OpenRouter error: ' + error.message
+        );
+        return false;
+    }
+}
+
 function processLocalAudio(monoChunk24k) {
     if (!isLocalActive) return;
 
@@ -488,6 +643,7 @@ function processLocalAudio(monoChunk24k) {
 
 function closeLocalSession() {
     isLocalActive = false;
+    answerBackend = 'llama';
     initializationController?.abort();
     initializationController = null;
     stopNativeServer(llamaProcess);
@@ -497,11 +653,7 @@ function closeLocalSession() {
     llamaBaseUrl = null;
     whisperBaseUrl = null;
     llamaModel = null;
-    isSpeaking = false;
-    speechBuffers = [];
-    silenceFrameCount = 0;
-    speechFrameCount = 0;
-    resampleRemainder = Buffer.alloc(0);
+    resetSpeechState();
     localConversationHistory = [];
     currentSystemPrompt = null;
 }
@@ -526,8 +678,27 @@ function isLocalSessionActive() {
 }
 
 async function sendLocalText(text) {
-    if (!isLocalActive || !llamaProcess) {
+    if (!isLocalActive) {
         return { success: false, error: 'No active local session' };
+    }
+
+    if (answerBackend === 'openrouter') {
+        try {
+            if (isGeneratingAnswer) {
+                return { success: false, error: 'Already generating a response' };
+            }
+            isGeneratingAnswer = true;
+            await sendToOpenRouter(text);
+            return { success: true };
+        } catch (error) {
+            return { success: false, error: error.message };
+        } finally {
+            isGeneratingAnswer = false;
+        }
+    }
+
+    if (!llamaProcess) {
+        return { success: false, error: 'No active local language model' };
     }
 
     try {
@@ -591,6 +762,7 @@ async function sendLocalImage(base64Data, prompt) {
 
 module.exports = {
     initializeLocalSession,
+    initializeWhisperOpenRouterSession,
     cancelLocalInitialization,
     processLocalAudio,
     closeLocalSession,

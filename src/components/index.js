@@ -10,3 +10,6 @@ export { HistoryView } from './views/HistoryView.js';
 export { AssistantView } from './views/AssistantView.js';
 export { OnboardingView } from './views/OnboardingView.js';
 export { AdvancedView } from './views/AdvancedView.js';
+export { UnlockView } from './views/UnlockView.js';
+export { PremiumPlanPicker } from './ui/premiumPlanPicker.js';
+export { PremiumLicenseInput } from './ui/premiumLicenseInput.js';

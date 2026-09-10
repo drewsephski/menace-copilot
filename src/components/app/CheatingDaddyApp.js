@@ -7,6 +7,7 @@ import { AssistantView } from '../views/AssistantView.js';
 import { OnboardingView } from '../views/OnboardingView.js';
 import { AICustomizeView } from '../views/AICustomizeView.js';
 import { FeedbackView } from '../views/FeedbackView.js';
+import { UnlockView } from '../views/UnlockView.js';
 
 export class CheatingDaddyApp extends LitElement {
     static styles = css`
@@ -24,7 +25,7 @@ export class CheatingDaddyApp extends LitElement {
             width: 100%;
             height: 100vh;
             overflow: hidden;
-            border-radius: 12px;
+            border-radius: var(--radius-hood);
             background: var(--bg-app);
             color: var(--text-primary);
         }
@@ -36,8 +37,9 @@ export class CheatingDaddyApp extends LitElement {
             height: calc(100vh - 2px);
             margin: 1px;
             overflow: hidden;
-            border: 2px solid rgba(255, 255, 255, 0.18);
-            border-radius: 11px;
+            min-height: 0;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-hood);
         }
 
         .top-drag-bar {
@@ -100,11 +102,13 @@ export class CheatingDaddyApp extends LitElement {
         .sidebar {
             width: var(--sidebar-width);
             min-width: var(--sidebar-width);
+            min-height: 0;
             background: var(--bg-surface);
             border-right: 1px solid var(--border);
             display: flex;
             flex-direction: column;
             padding: 42px 0 var(--space-md) 0;
+            overflow: hidden;
             transition:
                 width var(--transition),
                 min-width var(--transition),
@@ -135,6 +139,9 @@ export class CheatingDaddyApp extends LitElement {
 
         .sidebar-nav {
             flex: 1;
+            min-height: 0;
+            overflow-x: hidden;
+            overflow-y: auto;
             display: flex;
             flex-direction: column;
             gap: var(--space-xs);
@@ -190,8 +197,8 @@ export class CheatingDaddyApp extends LitElement {
             width: 100%;
             padding: var(--space-sm) var(--space-md);
             border-radius: var(--radius-md);
-            border: 1px solid rgba(239, 68, 68, 0.2);
-            background: rgba(239, 68, 68, 0.08);
+            border: 1px solid var(--tally-dim);
+            background: var(--tally-dim);
             color: var(--danger);
             font-size: var(--font-size-sm);
             font-weight: var(--font-weight-medium);
@@ -204,8 +211,8 @@ export class CheatingDaddyApp extends LitElement {
         }
 
         .update-btn:hover {
-            background: rgba(239, 68, 68, 0.14);
-            border-color: rgba(239, 68, 68, 0.35);
+            background: var(--bg-hover);
+            border-color: var(--tally);
         }
 
         @keyframes update-wobble {
@@ -244,6 +251,8 @@ export class CheatingDaddyApp extends LitElement {
 
         .content {
             flex: 1;
+            min-width: 0;
+            min-height: 0;
             overflow: hidden;
             display: flex;
             flex-direction: column;
@@ -252,15 +261,37 @@ export class CheatingDaddyApp extends LitElement {
 
         /* Live mode top bar */
         .live-bar {
-            position: relative;
-            display: flex;
+            display: grid;
+            grid-template-columns: auto minmax(0, 1fr) auto;
             align-items: center;
-            justify-content: space-between;
+            gap: var(--space-sm);
             padding: 0 var(--space-md);
             background: var(--bg-surface);
             border-bottom: 1px solid var(--border);
-            height: 36px;
+            min-height: 36px;
+            flex-shrink: 0;
             -webkit-app-region: drag;
+        }
+
+        .on-air {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: var(--font-size-xs);
+            color: var(--text-primary);
+            font-weight: var(--font-weight-medium);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
+        }
+
+        .on-air-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--tally);
+            box-shadow: 0 0 10px var(--tally-glow);
         }
 
         .live-bar-left {
@@ -293,20 +324,19 @@ export class CheatingDaddyApp extends LitElement {
         }
 
         .live-bar-center {
-            position: absolute;
-            left: 50%;
-            transform: translateX(-50%);
-            font-size: var(--font-size-xs);
-            color: var(--text-muted);
-            font-weight: var(--font-weight-medium);
-            white-space: nowrap;
+            justify-self: center;
+            min-width: 0;
+            text-align: center;
             pointer-events: none;
         }
 
         .live-bar-right {
             display: flex;
             align-items: center;
-            gap: var(--space-md);
+            justify-content: flex-end;
+            flex-wrap: nowrap;
+            gap: var(--space-sm);
+            min-width: 0;
             -webkit-app-region: no-drag;
             z-index: 1;
         }
@@ -316,22 +346,19 @@ export class CheatingDaddyApp extends LitElement {
             color: var(--text-muted);
             font-family: var(--font-mono);
             white-space: nowrap;
-        }
-
-        .live-bar-text.clickable {
-            cursor: pointer;
-            transition: color var(--transition);
-        }
-
-        .live-bar-text.clickable:hover {
-            color: var(--text-primary);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            min-width: 0;
         }
 
         /* Content inner */
         .content-inner {
             flex: 1;
+            min-width: 0;
+            min-height: 0;
             overflow-y: auto;
             overflow-x: hidden;
+            overscroll-behavior: contain;
         }
 
         .content-inner.live {
@@ -388,6 +415,7 @@ export class CheatingDaddyApp extends LitElement {
         _updateAvailable: { state: true },
         _whisperDownloading: { state: true },
         _localAiDownloadProgress: { state: true },
+        _license: { state: true },
     };
 
     constructor() {
@@ -414,6 +442,7 @@ export class CheatingDaddyApp extends LitElement {
         this._updateAvailable = false;
         this._whisperDownloading = false;
         this._localAiDownloadProgress = { active: false, label: '', percentage: null };
+        this._license = { valid: false, status: 'missing' };
         this._localVersion = '';
 
         this._loadFromStorage();
@@ -445,14 +474,26 @@ export class CheatingDaddyApp extends LitElement {
 
     async _loadFromStorage() {
         try {
-            const [config, prefs] = await Promise.all([cheatingDaddy.storage.getConfig(), cheatingDaddy.storage.getPreferences()]);
+            const [config, prefs, license] = await Promise.all([
+                cheatingDaddy.storage.getConfig(),
+                cheatingDaddy.storage.getPreferences(),
+                cheatingDaddy.license.getStatus(),
+            ]);
 
-            this.currentView = config.onboarded ? 'main' : 'onboarding';
+            if (!config.onboarded) {
+                this.currentView = 'onboarding';
+            } else if (!license.valid) {
+                this.currentView = 'license';
+            } else {
+                this.currentView = 'main';
+            }
+
             this.selectedProfile = prefs.selectedProfile || 'interview';
             this.selectedLanguage = prefs.selectedLanguage || 'en-US';
             this.selectedScreenshotInterval = prefs.selectedScreenshotInterval || '5';
             this.selectedImageQuality = prefs.selectedImageQuality || 'medium';
             this.layoutMode = config.layout || 'normal';
+            this._license = license;
 
             this._storageLoaded = true;
             this.requestUpdate();
@@ -556,8 +597,23 @@ export class CheatingDaddyApp extends LitElement {
 
     // ── Navigation ──
 
-    navigate(view) {
+    async navigate(view) {
+        if (view === 'license') {
+            this._license = await cheatingDaddy.license.getStatus();
+        }
         this.currentView = view;
+        this.requestUpdate();
+    }
+
+    async handleUnlock() {
+        await this.navigate('license');
+    }
+
+    handleLicenseChanged(event) {
+        this._license = event.detail || { valid: false, status: 'missing' };
+        if (this._license.valid && this.currentView === 'license') {
+            this.currentView = 'main';
+        }
         this.requestUpdate();
     }
 
@@ -596,6 +652,14 @@ export class CheatingDaddyApp extends LitElement {
     // ── Session start ──
 
     async handleStart() {
+        const license = await cheatingDaddy.license.getStatus();
+        this._license = license;
+        if (!license.valid) {
+            this.currentView = 'license';
+            this.requestUpdate();
+            return;
+        }
+
         const prefs = await cheatingDaddy.storage.getPreferences();
         const providerMode = prefs.providerMode === 'cloud' ? 'byok' : prefs.providerMode || 'byok';
 
@@ -619,6 +683,28 @@ export class CheatingDaddyApp extends LitElement {
             }
         } else if (providerMode === 'local') {
             const success = await cheatingDaddy.initializeLocal(this.selectedProfile);
+            if (!success) {
+                const mainView = this.shadowRoot.querySelector('main-view');
+                if (mainView && mainView.triggerApiKeyError) {
+                    mainView.triggerApiKeyError();
+                }
+                return;
+            }
+        } else if (providerMode === 'whisper_openrouter') {
+            const access = await cheatingDaddy.openrouter.getAccess();
+            if (!access.available) {
+                const mainView = this.shadowRoot.querySelector('main-view');
+                if (mainView && mainView.triggerApiKeyError) {
+                    mainView.triggerApiKeyError();
+                }
+                if (!license.valid) {
+                    this.currentView = 'license';
+                    this.requestUpdate();
+                }
+                return;
+            }
+
+            const success = await cheatingDaddy.initializeWhisperOpenRouter(this.selectedProfile);
             if (!success) {
                 const mainView = this.shadowRoot.querySelector('main-view');
                 if (mainView && mainView.triggerApiKeyError) {
@@ -655,14 +741,7 @@ export class CheatingDaddyApp extends LitElement {
     async handleAPIKeyHelp() {
         if (window.require) {
             const { ipcRenderer } = window.require('electron');
-            await ipcRenderer.invoke('open-external', 'https://cheatingdaddy.com/help/api-key');
-        }
-    }
-
-    async handleGroqAPIKeyHelp() {
-        if (window.require) {
-            const { ipcRenderer } = window.require('electron');
-            await ipcRenderer.invoke('open-external', 'https://console.groq.com/keys');
+            await ipcRenderer.invoke('open-external', 'https://openrouter.ai/keys');
         }
     }
 
@@ -717,8 +796,16 @@ export class CheatingDaddyApp extends LitElement {
         this.requestUpdate();
     }
 
-    handleOnboardingComplete() {
-        this.currentView = 'main';
+    async handleOnboardingComplete() {
+        if (window.require) {
+            const { ipcRenderer } = window.require('electron');
+            await ipcRenderer.invoke('refresh-display-media-handler');
+        }
+
+        const license = await cheatingDaddy.license.getStatus();
+        this._license = license;
+        this.currentView = license.valid ? 'main' : 'license';
+        this.requestUpdate();
     }
 
     updated(changedProperties) {
@@ -742,7 +829,11 @@ export class CheatingDaddyApp extends LitElement {
         switch (this.currentView) {
             case 'onboarding':
                 return html`
-                    <onboarding-view .onComplete=${() => this.handleOnboardingComplete()} .onClose=${() => this.handleClose()}></onboarding-view>
+                    <onboarding-view
+                        .onComplete=${() => this.handleOnboardingComplete()}
+                        .onExternalLink=${url => this.handleExternalLinkClick(url)}
+                        .onLicenseChanged=${status => this.handleLicenseChanged({ detail: status })}
+                    ></onboarding-view>
                 `;
 
             case 'main':
@@ -751,6 +842,9 @@ export class CheatingDaddyApp extends LitElement {
                         .selectedProfile=${this.selectedProfile}
                         .onProfileChange=${p => this.handleProfileChange(p)}
                         .onStart=${() => this.handleStart()}
+                        .onUnlock=${() => this.handleUnlock()}
+                        .licenseValid=${Boolean(this._license?.valid)}
+                        .hostedAi=${Boolean(this._license?.hostedAi)}
                         .onExternalLink=${url => this.handleExternalLinkClick(url)}
                         .whisperDownloading=${this._whisperDownloading}
                         .downloadProgress=${this._localAiDownloadProgress}
@@ -791,6 +885,9 @@ export class CheatingDaddyApp extends LitElement {
             case 'history':
                 return html`<history-view></history-view>`;
 
+            case 'license':
+                return html` <unlock-view .license=${this._license} @license-changed=${event => this.handleLicenseChanged(event)}></unlock-view> `;
+
             case 'assistant':
                 return html`
                     <assistant-view
@@ -824,6 +921,16 @@ export class CheatingDaddyApp extends LitElement {
                             d="m19 8.71l-5.333-4.148a2.666 2.666 0 0 0-3.274 0L5.059 8.71a2.67 2.67 0 0 0-1.029 2.105v7.2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.2c0-.823-.38-1.6-1.03-2.105"
                         />
                         <path d="M16 15c-2.21 1.333-5.792 1.333-8 0" />
+                    </g>
+                </svg>`,
+            },
+            {
+                id: 'license',
+                label: 'License',
+                icon: html`<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24">
+                    <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
+                        <path d="M8 8a4 4 0 1 1 8 0v1h1a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h1zm3 7v2m2-2v2" />
+                        <path d="M10 9V8a2 2 0 1 1 4 0v1" />
                     </g>
                 </svg>`,
             },
@@ -890,7 +997,7 @@ export class CheatingDaddyApp extends LitElement {
         return html`
             <div class="sidebar ${this._isLiveMode() ? 'hidden' : ''}">
                 <div class="sidebar-brand">
-                    <h1>Cheating Daddy</h1>
+                    <h1>Menace Agent</h1>
                 </div>
                 <nav class="sidebar-nav">
                     ${items.map(
@@ -909,7 +1016,7 @@ export class CheatingDaddyApp extends LitElement {
                     ${
                         this._updateAvailable
                             ? html`
-                                  <button class="update-btn" @click=${() => this.handleExternalLinkClick('https://cheatingdaddy.com/download')}>
+                                  <button class="update-btn" @click=${() => this.handleExternalLinkClick('https://openrouter.ai')}>
                                       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                                           <path
                                               fill="none"
@@ -955,12 +1062,14 @@ export class CheatingDaddyApp extends LitElement {
                         </svg>
                     </button>
                 </div>
-                <div class="live-bar-center">${profileLabels[this.selectedProfile] || 'Session'}</div>
+                <div class="live-bar-center">
+                    <span class="on-air"
+                        ><span class="on-air-dot" aria-hidden="true"></span>Live · ${profileLabels[this.selectedProfile] || 'Session'}</span
+                    >
+                </div>
                 <div class="live-bar-right">
-                    ${this.statusText ? html`<span class="live-bar-text">${this.statusText}</span>` : ''}
                     <span class="live-bar-text">${this.getElapsedTime()}</span>
-                    ${this._isClickThrough ? html`<span class="live-bar-text">[click through]</span>` : ''}
-                    <span class="live-bar-text clickable" @click=${() => this.handleHideToggle()}>[hide]</span>
+                    ${this._isClickThrough ? html`<span class="live-bar-text">click-through</span>` : ''}
                 </div>
             </div>
         `;

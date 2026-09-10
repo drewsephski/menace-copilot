@@ -1,0 +1,60 @@
+{
+  "buildPath": "code",
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "bounce-easing",
+        "value": "update-wobble",
+        "createdAt": "2026-09-02T20:07:46.946Z",
+        "reason": "Existing CheatingDaddyApp update-button wobble; not part of OpenRouter settings copy change"
+      },
+      {
+        "rule": "layout-transition",
+        "value": "width",
+        "createdAt": "2026-09-02T20:07:47.066Z",
+        "reason": "Existing MainView download progress fill width transition; not part of OpenRouter settings copy change"
+      },
+      {
+        "rule": "design-system-radius",
+        "value": "11px",
+        "createdAt": "2026-09-02T22:02:17.882Z",
+        "reason": "DESIGN.md: inner chrome shell is 11px, one step inside the 12px hood"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#ff5f57",
+        "createdAt": "2026-09-02T22:02:18.886Z",
+        "reason": "Agent: macOS traffic-light close is literal window chrome, not brand"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#febc2e",
+        "createdAt": "2026-09-02T22:02:19.482Z",
+        "reason": "Agent: macOS traffic-light minimize is literal window chrome, not brand"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#28c840",
+        "createdAt": "2026-09-02T22:02:20.015Z",
+        "reason": "Agent: macOS traffic-light maximize is literal window chrome, not brand"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "10px",
+        "createdAt": "2026-09-02T22:03:18.065Z",
+        "reason": "DESIGN.md: ON AIR tally label is 10px uppercase tracked"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "*",
+        "files": [
+          "src/utils/renderer.js"
+        ],
+        "createdAt": "2026-09-02T22:15:11.004Z",
+        "reason": "Agent: Customize theme catalog must carry alternate palettes; Autocue brand tokens live in DESIGN.md and src/index.html"
+      }
+    ]
+  }
+}

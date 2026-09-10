@@ -1,28 +1,37 @@
 {
-    "name": "cheating-daddy",
-    "productName": "cheating-daddy",
-    "version": "0.8.0",
-    "description": "cheating daddy",
+    "name": "menace-agent",
+    "productName": "Menace Agent",
+    "version": "1.0.0",
+    "description": "Menace Agent — live interview autocue with OpenRouter and local Whisper",
     "main": "src/index.js",
     "scripts": {
-        "start": "electron-forge start",
+        "start": "node scripts/ensure-macos-audio-helper.js && electron-forge start",
+        "start:macos": "node scripts/ensure-macos-audio-helper.js && env -u ELECTRON_RUN_AS_NODE \"$HOME/Applications/Menace Agent Dev.app/Contents/MacOS/Electron\" .",
+        "dev": "node scripts/ensure-macos-audio-helper.js && electron .",
+        "macos:audio-permissions": "env -u ELECTRON_RUN_AS_NODE electron scripts/request-macos-audio-permission.js",
         "package": "electron-forge package",
+        "package:macos": "node scripts/package-macos-manual.js",
+        "package:macos:forge": "electron-forge package --platform=darwin",
         "make": "electron-forge make",
+        "make:macos": "npm run package:macos && electron-forge make --platform=darwin --skip-package",
+        "install:macos": "node scripts/install-macos-app.js",
         "publish": "electron-forge publish",
-        "lint": "echo \"No linting configured\""
+        "lint": "echo \"No linting configured\"",
+        "polar:sync": "node scripts/sync-polar-production.js --write",
+        "polar:test-discount": "node scripts/create-polar-test-discount.js",
+        "test:license-flow": "node scripts/test-hosted-license-flow.js"
     },
     "keywords": [
-        "cheating daddy",
-        "cheating daddy ai",
-        "cheating daddy ai assistant",
-        "cheating daddy ai assistant for interviews",
-        "cheating daddy ai assistant for interviews"
+        "menace agent",
+        "interview assistant",
+        "openrouter",
+        "whisper",
+        "live autocue"
     ],
     "author": {
-        "name": "sohzm",
-        "email": "sohambharambe9@gmail.com"
+        "name": "drew",
+        "email": "drewsepeczi@gmail.com"
     },
-    "license": "GPL-3.0",
     "dependencies": {
         "@google/genai": "^1.2.0",
         "electron-squirrel-startup": "^1.0.1",

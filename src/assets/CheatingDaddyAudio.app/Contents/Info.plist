@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleExecutable</key>
+	<string>CheatingDaddyAudio</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.menaceagent.systemaudio</string>
+	<key>CFBundleName</key>
+	<string>MenaceAgentAudio</string>
+	<key>CFBundleDisplayName</key>
+	<string>Menace Agent Audio</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>13.0</string>
+	<key>NSAudioCaptureUsageDescription</key>
+	<string>Menace Agent needs system audio access to hear the interviewer from your computer speakers or headset.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Menace Agent needs microphone access when mic mode is enabled.</string>
+	<key>NSScreenCaptureDescription</key>
+	<string>Menace Agent needs screen and system audio capture to assist during interviews.</string>
+</dict>
+</plist>

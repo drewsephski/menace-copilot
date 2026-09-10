@@ -2,10 +2,15 @@ if (require('electron-squirrel-startup')) {
     process.exit(0);
 }
 
+require('./utils/loadEnv').loadEnv();
+
 const { app, BrowserWindow, shell, ipcMain } = require('electron');
 const { createWindow, updateGlobalShortcuts } = require('./utils/window');
 const { setupGeminiIpcHandlers, stopMacOSAudioCapture, sendToRenderer } = require('./utils/gemini');
 const storage = require('./storage');
+const polar = require('./utils/polar');
+const { isAllowedPolarUrl } = require('./utils/polarConfig');
+const { getOpenRouterAccess, getUserOpenRouterApiKey, syncLicensedHostedAccess } = require('./utils/openrouterCredentials');
 
 const geminiSessionRef = { current: null };
 let mainWindow = null;
@@ -19,16 +24,40 @@ app.whenReady().then(async () => {
     // Initialize storage (checks version, resets if needed)
     storage.initializeStorage();
 
-    // Trigger screen recording permission prompt on macOS if not already granted
     if (process.platform === 'darwin') {
-        const { desktopCapturer } = require('electron');
-        desktopCapturer.getSources({ types: ['screen'] }).catch(() => {});
+        const { desktopCapturer, systemPreferences } = require('electron');
+
+        try {
+            const screenStatus = systemPreferences.getMediaAccessStatus('screen');
+            const config = storage.getConfig();
+
+            if (!config.onboarded && screenStatus !== 'granted') {
+                desktopCapturer.getSources({ types: ['screen'] }).catch(() => {});
+            }
+
+            if (screenStatus !== 'granted') {
+                console.warn(
+                    'macOS screen/system-audio access is not granted for this process.',
+                    'Enable Electron (or Menace Agent) under System Settings → Privacy & Security → Screen & System Audio Recording,',
+                    'and on macOS 26+ also under System Audio Recording Only.'
+                );
+            }
+        } catch (error) {
+            console.warn('Unable to check macOS media access status:', error.message);
+        }
     }
 
     createMainWindow();
     setupGeminiIpcHandlers(geminiSessionRef);
     setupStorageIpcHandlers();
+    setupOpenRouterIpcHandlers();
+    setupPolarIpcHandlers();
     setupGeneralIpcHandlers();
+
+    polar
+        .getLicenseStatus()
+        .then(syncLicensedHostedAccess)
+        .catch(error => console.warn('Could not sync hosted AI access:', error.message));
 });
 
 app.on('window-all-closed', () => {
@@ -119,21 +148,21 @@ function setupStorageIpcHandlers() {
         }
     });
 
-    ipcMain.handle('storage:get-groq-api-key', async () => {
+    ipcMain.handle('storage:get-openrouter-api-key', async () => {
         try {
-            return { success: true, data: storage.getGroqApiKey() };
+            return { success: true, data: getUserOpenRouterApiKey() };
         } catch (error) {
-            console.error('Error getting Groq API key:', error);
+            console.error('Error getting OpenRouter API key:', error);
             return { success: false, error: error.message };
         }
     });
 
-    ipcMain.handle('storage:set-groq-api-key', async (event, groqApiKey) => {
+    ipcMain.handle('storage:set-openrouter-api-key', async (event, openrouterApiKey) => {
         try {
-            storage.setGroqApiKey(groqApiKey);
+            storage.setOpenRouterApiKey(openrouterApiKey);
             return { success: true };
         } catch (error) {
-            console.error('Error setting Groq API key:', error);
+            console.error('Error setting OpenRouter API key:', error);
             return { success: false, error: error.message };
         }
     });
@@ -259,6 +288,78 @@ function setupStorageIpcHandlers() {
     });
 }
 
+function setupOpenRouterIpcHandlers() {
+    ipcMain.handle('openrouter:get-access', async () => {
+        try {
+            return { success: true, data: getOpenRouterAccess() };
+        } catch (error) {
+            console.error('Error resolving OpenRouter access:', error);
+            return { success: false, error: error.message };
+        }
+    });
+}
+
+function setupPolarIpcHandlers() {
+    ipcMain.handle('polar:get-status', async () => {
+        try {
+            return { success: true, data: await polar.getLicenseStatus() };
+        } catch (error) {
+            console.error('Error checking Polar license:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('polar:activate', async (event, rawKey) => {
+        try {
+            if (typeof rawKey !== 'string') {
+                return { success: false, error: 'Enter a valid license key.' };
+            }
+            return await polar.activateLicense(rawKey);
+        } catch (error) {
+            console.error('Error activating Polar license:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('polar:clear', async () => {
+        try {
+            return { success: true, data: polar.clearLicense() };
+        } catch (error) {
+            console.error('Error clearing Polar license:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('polar:open-portal', async () => {
+        try {
+            await shell.openExternal(polar.getCustomerPortalUrl());
+            return { success: true };
+        } catch (error) {
+            console.error('Error opening Polar customer portal:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('polar:open-checkout', async (event, sku) => {
+        try {
+            if (typeof sku !== 'string') {
+                return { success: false, error: 'Unknown plan.' };
+            }
+
+            const result = polar.getCheckoutUrl(sku);
+            if (!result.success) {
+                return result;
+            }
+
+            await shell.openExternal(result.url);
+            return { success: true };
+        } catch (error) {
+            console.error('Error opening Polar checkout:', error);
+            return { success: false, error: error.message };
+        }
+    });
+}
+
 function setupGeneralIpcHandlers() {
     ipcMain.handle('get-app-version', async () => {
         return app.getVersion();
@@ -277,6 +378,22 @@ function setupGeneralIpcHandlers() {
 
     ipcMain.handle('open-external', async (event, url) => {
         try {
+            if (typeof url !== 'string' || url.length > 2048) {
+                return { success: false, error: 'Invalid URL' };
+            }
+
+            let parsed;
+            try {
+                parsed = new URL(url);
+            } catch {
+                return { success: false, error: 'Invalid URL' };
+            }
+
+            const allowedProtocols = new Set(['https:', 'http:', 'mailto:', 'x-apple.systempreferences:']);
+            if (!allowedProtocols.has(parsed.protocol) && !isAllowedPolarUrl(url)) {
+                return { success: false, error: 'URL scheme not allowed' };
+            }
+
             await shell.openExternal(url);
             return { success: true };
         } catch (error) {

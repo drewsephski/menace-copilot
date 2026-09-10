@@ -49,12 +49,12 @@ const storage = {
     async setApiKey(apiKey) {
         return ipcRenderer.invoke('storage:set-api-key', apiKey);
     },
-    async getGroqApiKey() {
-        const result = await ipcRenderer.invoke('storage:get-groq-api-key');
+    async getOpenRouterApiKey() {
+        const result = await ipcRenderer.invoke('storage:get-openrouter-api-key');
         return result.success ? result.data : '';
     },
-    async setGroqApiKey(groqApiKey) {
-        return ipcRenderer.invoke('storage:set-groq-api-key', groqApiKey);
+    async setOpenRouterApiKey(openrouterApiKey) {
+        return ipcRenderer.invoke('storage:set-openrouter-api-key', openrouterApiKey);
     },
 
     // Preferences
@@ -109,6 +109,33 @@ const storage = {
     },
 };
 
+const openrouter = {
+    async getAccess() {
+        const result = await ipcRenderer.invoke('openrouter:get-access');
+        return result.success ? result.data : { available: false, source: 'none', hostedConfigured: false };
+    },
+};
+
+const license = {
+    async getStatus() {
+        const result = await ipcRenderer.invoke('polar:get-status');
+        return result.success ? result.data : { valid: false, status: 'error', error: result.error || 'Could not check this license.' };
+    },
+    async activate(key) {
+        return ipcRenderer.invoke('polar:activate', key);
+    },
+    async clear() {
+        const result = await ipcRenderer.invoke('polar:clear');
+        return result.success ? result.data : { valid: false, status: 'error', error: result.error };
+    },
+    async openCheckout(sku) {
+        return ipcRenderer.invoke('polar:open-checkout', sku);
+    },
+    async openPortal() {
+        return ipcRenderer.invoke('polar:open-portal');
+    },
+};
+
 // Cache for preferences to avoid async calls in hot paths
 let preferencesCache = null;
 
@@ -156,7 +183,7 @@ async function initializeGemini(profile = 'interview', language = 'en-US') {
 async function initializeLocal(profile = 'interview') {
     const prefs = await storage.getPreferences();
     const localLlmModel = prefs.localLlmModel || 'unsloth/Qwen3.5-4B-GGUF:Q4_K_M';
-    const whisperModel = prefs.whisperModel || 'tiny.en';
+    const whisperModel = prefs.whisperModel || 'base.en';
     const customPrompt = prefs.customPrompt || '';
 
     const success = await ipcRenderer.invoke('initialize-local', localLlmModel, whisperModel, profile, customPrompt);
@@ -167,6 +194,21 @@ async function initializeLocal(profile = 'interview') {
         cheatingDaddy.setStatus('error');
         return false;
     }
+}
+
+async function initializeWhisperOpenRouter(profile = 'interview') {
+    const prefs = await storage.getPreferences();
+    const whisperModel = prefs.whisperModel || 'base.en';
+    const customPrompt = prefs.customPrompt || '';
+
+    const success = await ipcRenderer.invoke('initialize-whisper-openrouter', whisperModel, profile, customPrompt);
+    if (success) {
+        cheatingDaddy.setStatus('Whisper + OpenRouter Live');
+        return true;
+    }
+
+    cheatingDaddy.setStatus('error');
+    return false;
 }
 
 async function cancelLocalInitialization() {
@@ -792,18 +834,18 @@ const cheatingDaddyApp = document.querySelector('cheating-daddy-app');
 const theme = {
     themes: {
         dark: {
-            background: '#101010',
-            text: '#e0e0e0',
-            textSecondary: '#a0a0a0',
-            textMuted: '#6b6b6b',
-            border: '#2a2a2a',
-            accent: '#ffffff',
-            btnPrimaryBg: '#ffffff',
-            btnPrimaryText: '#000000',
-            btnPrimaryHover: '#e0e0e0',
+            background: '#0b0b0b',
+            text: '#f7f7f2',
+            textSecondary: '#a8a89e',
+            textMuted: '#5c5c56',
+            border: 'rgba(247, 247, 242, 0.08)',
+            accent: '#c41e3a',
+            btnPrimaryBg: '#c41e3a',
+            btnPrimaryText: '#f7f7f2',
+            btnPrimaryHover: '#a81830',
             tooltipBg: '#1a1a1a',
-            tooltipText: '#ffffff',
-            keyBg: 'rgba(255,255,255,0.1)',
+            tooltipText: '#f7f7f2',
+            keyBg: 'rgba(247, 247, 242, 0.06)',
         },
         light: {
             background: '#ffffff',
@@ -927,7 +969,7 @@ const theme = {
 
     getAll() {
         const names = {
-            dark: 'Dark',
+            dark: 'Autocue',
             light: 'Light',
             midnight: 'Midnight Blue',
             sepia: 'Sepia',
@@ -942,6 +984,11 @@ const theme = {
             name: names[key] || key,
             colors: this.themes[key],
         }));
+    },
+
+    rgbaFromHex(hex, alpha) {
+        const rgb = this.hexToRgb(hex);
+        return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
     },
 
     hexToRgb(hex) {
@@ -1010,38 +1057,45 @@ const theme = {
         const colors = this.get(themeName);
         this.current = themeName;
         const root = document.documentElement;
+        const hairline = this.rgbaFromHex(colors.text, 0.08);
+        const hairlineStrong = this.rgbaFromHex(colors.text, 0.14);
 
         // New design tokens (used by components)
         root.style.setProperty('--text-primary', colors.text);
         root.style.setProperty('--text-secondary', colors.textSecondary);
         root.style.setProperty('--text-muted', colors.textMuted);
-        root.style.setProperty('--border', colors.border);
-        root.style.setProperty('--border-strong', colors.accent);
+        root.style.setProperty('--border', hairline);
+        root.style.setProperty('--border-strong', hairlineStrong);
         root.style.setProperty('--accent', colors.btnPrimaryBg);
         root.style.setProperty('--accent-hover', colors.btnPrimaryHover);
+        // Camera tally stays red; never inherit a themed white CTA.
+        root.style.setProperty('--tally', '#c41e3a');
+        root.style.setProperty('--tally-hover', '#a81830');
 
         // Legacy aliases
         root.style.setProperty('--text-color', colors.text);
-        root.style.setProperty('--border-color', colors.border);
-        root.style.setProperty('--border-default', colors.accent);
+        root.style.setProperty('--border-color', hairline);
+        root.style.setProperty('--border-default', hairlineStrong);
         root.style.setProperty('--placeholder-color', colors.textMuted);
-        root.style.setProperty('--scrollbar-thumb', colors.border);
+        root.style.setProperty('--scrollbar-thumb', hairlineStrong);
         root.style.setProperty('--scrollbar-thumb-hover', colors.textMuted);
         root.style.setProperty('--key-background', colors.keyBg);
         // Primary button
         root.style.setProperty('--btn-primary-bg', colors.btnPrimaryBg);
         root.style.setProperty('--btn-primary-text', colors.btnPrimaryText);
         root.style.setProperty('--btn-primary-hover', colors.btnPrimaryHover);
-        // Start button (same as primary)
-        root.style.setProperty('--start-button-background', colors.btnPrimaryBg);
-        root.style.setProperty('--start-button-color', colors.btnPrimaryText);
-        root.style.setProperty('--start-button-hover-background', colors.btnPrimaryHover);
+        // Start / on-air actions stay tally + cream so hover never washes out type
+        root.style.setProperty('--start-button-background', '#c41e3a');
+        root.style.setProperty('--start-button-color', '#f7f7f2');
+        root.style.setProperty('--start-button-hover-background', '#a81830');
+        root.style.setProperty('--start-button-border', 'transparent');
+        root.style.setProperty('--start-button-hover-border', 'transparent');
         // Tooltip
         root.style.setProperty('--tooltip-bg', colors.tooltipBg);
         root.style.setProperty('--tooltip-text', colors.tooltipText);
         // Error color (stays constant)
-        root.style.setProperty('--error-color', '#f14c4c');
-        root.style.setProperty('--success-color', '#4caf50');
+        root.style.setProperty('--error-color', '#c41e3a');
+        root.style.setProperty('--success-color', '#5aab6e');
 
         // Also apply background colors from theme
         this.applyBackgrounds(colors.background, alpha);
@@ -1088,6 +1142,7 @@ const cheatingDaddy = {
     initializeGemini,
     initializeCloud,
     initializeLocal,
+    initializeWhisperOpenRouter,
     cancelLocalInitialization,
     startCapture,
     stopCapture,
@@ -1096,6 +1151,12 @@ const cheatingDaddy = {
 
     // Storage API
     storage,
+
+    // Polar license
+    license,
+
+    // OpenRouter access (hosted vs BYOK)
+    openrouter,
 
     // Theme API
     theme,

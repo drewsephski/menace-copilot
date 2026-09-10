@@ -3,7 +3,9 @@ const { BrowserWindow, ipcMain } = require('electron');
 const { spawn } = require('child_process');
 const { saveDebugAudio } = require('../audioUtils');
 const { getSystemPrompt } = require('./prompts');
-const { getAvailableModel, incrementLimitCount, getApiKey, getGroqApiKey, incrementCharUsage, getConfig } = require('../storage');
+const { getAvailableModel, incrementLimitCount, getApiKey, incrementCharUsage, getConfig } = require('../storage');
+const { getEffectiveOpenRouterApiKey } = require('./openrouterCredentials');
+const polar = require('./polar');
 const { connectCloud, sendCloudAudio, sendCloudText, sendCloudImage, closeCloud, isCloudActive, setOnTurnComplete } = require('./cloud');
 const { startTransportLog, logTransportEvent, closeTransportLog } = require('./transportLogger');
 
@@ -14,11 +16,15 @@ function getLocalAi() {
     return _localai;
 }
 
-// Provider mode: 'byok', 'cloud', or 'local'
+// Provider mode: 'byok', 'cloud', 'local', or 'whisper_openrouter'
 let currentProviderMode = 'byok';
 
-// Groq conversation history for context
-let groqConversationHistory = [];
+function usesLocalWhisper() {
+    return currentProviderMode === 'local' || currentProviderMode === 'whisper_openrouter';
+}
+
+// OpenRouter conversation history for context
+let answerConversationHistory = [];
 
 // Conversation tracking variables
 let currentSessionId = null;
@@ -46,11 +52,13 @@ module.exports.formatSpeakerResults = formatSpeakerResults;
 // Audio capture variables
 let systemAudioProc = null;
 let messageBuffer = '';
-let groqRequestStartedForTurn = false;
+let openRouterRequestStartedForTurn = false;
 
-const GROQ_MAX_COMPLETION_TOKENS = 16384;
-const GROQ_EMPTY_RESPONSE_MESSAGE =
-    'Groq reached the maximum completion-token limit before returning a final answer. Disable thinking in Home → AI responses and try again.';
+const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
+const OPENROUTER_MAX_TOKENS = 16384;
+const OPENROUTER_VISION_MODEL = 'google/gemini-2.5-flash';
+const OPENROUTER_EMPTY_RESPONSE_MESSAGE =
+    'OpenRouter reached the maximum token limit before returning a final answer. Try a shorter prompt or a different model.';
 
 // Reconnection variables
 let isUserClosing = false;
@@ -83,10 +91,10 @@ function initializeNewSession(profile = null, customPrompt = null) {
     currentSessionId = Date.now().toString();
     startTransportLog(currentSessionId);
     currentTranscription = '';
-    groqRequestStartedForTurn = false;
+    openRouterRequestStartedForTurn = false;
     conversationHistory = [];
     screenAnalysisHistory = [];
-    groqConversationHistory = [];
+    answerConversationHistory = [];
     currentProfile = profile;
     currentCustomPrompt = customPrompt;
     console.log('New conversation session started:', currentSessionId, 'profile:', profile);
@@ -205,14 +213,22 @@ async function getStoredSetting(key, defaultValue) {
     return defaultValue;
 }
 
-// helper to check if groq has been configured
-function hasGroqKey() {
-    const key = getGroqApiKey();
-    return key && key.trim() != '';
+function hasOpenRouterKey() {
+    const key = getEffectiveOpenRouterApiKey();
+    return Boolean(key && key.trim());
 }
 
-function sendFinalTranscriptionToGroq() {
-    if (!hasGroqKey() || groqRequestStartedForTurn) {
+async function ensureLicensedSession() {
+    const gate = await polar.requireActiveLicense();
+    if (!gate.ok) {
+        sendToRenderer('update-status', gate.error);
+        return false;
+    }
+    return true;
+}
+
+function sendFinalTranscriptionToOpenRouter() {
+    if (!hasOpenRouterKey() || openRouterRequestStartedForTurn) {
         return;
     }
 
@@ -221,8 +237,8 @@ function sendFinalTranscriptionToGroq() {
         return;
     }
 
-    groqRequestStartedForTurn = true;
-    sendToGroq(transcription);
+    openRouterRequestStartedForTurn = true;
+    sendToOpenRouter(transcription);
 }
 
 function trimConversationHistoryForGemma(history, maxChars = 42000) {
@@ -250,298 +266,168 @@ function stripThinkingTags(text) {
     return text.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '').trim();
 }
 
-function getGroqReasoningOptions(model, disableThinking) {
-    if (model.includes('qwen3')) {
-        const options = {
-            reasoning_format: 'hidden',
-        };
+async function readOpenRouterSseStream(response, eventPrefix, onDisplayText) {
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let fullText = '';
+    let finishReason = null;
+    let isFirst = true;
 
-        if (disableThinking) {
-            options.reasoning_effort = 'none';
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        logTransportEvent(`${eventPrefix}.stream_chunk`, { chunk: buffer.slice(-2000) });
+
+        while (true) {
+            const lineEnd = buffer.indexOf('\n');
+            if (lineEnd === -1) break;
+
+            const line = buffer.slice(0, lineEnd).trim();
+            buffer = buffer.slice(lineEnd + 1);
+
+            if (!line || line.startsWith(':')) continue;
+            if (!line.startsWith('data: ')) continue;
+
+            const data = line.slice(6);
+            if (data === '[DONE]') continue;
+
+            try {
+                const json = JSON.parse(data);
+                logTransportEvent(`${eventPrefix}.stream_event`, json);
+                finishReason = json.choices?.[0]?.finish_reason || finishReason;
+                const token = json.choices?.[0]?.delta?.content || '';
+                if (!token) continue;
+
+                fullText += token;
+                const displayText = stripThinkingTags(fullText);
+                if (displayText) {
+                    onDisplayText(displayText, isFirst);
+                    isFirst = false;
+                }
+            } catch (parseError) {
+                logTransportEvent(`${eventPrefix}.stream_parse_error`, {
+                    data,
+                    error: parseError.message,
+                });
+            }
         }
-
-        return options;
     }
 
-    if (model.startsWith('openai/gpt-oss-')) {
-        return {
-            include_reasoning: false,
-        };
-    }
-
-    return {};
+    return { fullText, finishReason };
 }
 
-async function sendToGroq(transcription) {
-    const groqApiKey = getGroqApiKey();
-    if (!groqApiKey) {
-        console.log('No Groq API key configured, skipping Groq response');
+async function sendToOpenRouter(transcription) {
+    const openRouterApiKey = getEffectiveOpenRouterApiKey();
+    if (!openRouterApiKey) {
+        console.log('No OpenRouter API key configured, skipping OpenRouter response');
         return;
     }
 
     if (!transcription || transcription.trim() === '') {
-        console.log('Empty transcription, skipping Groq');
+        console.log('Empty transcription, skipping OpenRouter');
         return;
     }
 
     const config = getConfig();
-    const modelToUse = config.groqModel;
+    const modelToUse = config.openrouterModel;
 
-    console.log(`Sending to Groq (${modelToUse}):`, transcription.substring(0, 100) + '...');
-    logTransportEvent('groq.text.request', {
+    console.log(`Sending to OpenRouter (${modelToUse}):`, transcription.substring(0, 100) + '...');
+    logTransportEvent('openrouter.text.request', {
         model: modelToUse,
         transcription,
     });
 
-    groqConversationHistory.push({
+    answerConversationHistory.push({
         role: 'user',
         content: transcription.trim(),
     });
 
-    if (groqConversationHistory.length > 20) {
-        groqConversationHistory = groqConversationHistory.slice(-20);
+    if (answerConversationHistory.length > 20) {
+        answerConversationHistory = answerConversationHistory.slice(-20);
     }
 
     try {
-        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        const response = await fetch(OPENROUTER_API_URL, {
             method: 'POST',
             headers: {
-                Authorization: `Bearer ${groqApiKey}`,
+                Authorization: `Bearer ${openRouterApiKey}`,
                 'Content-Type': 'application/json',
+                'HTTP-Referer': 'https://openrouter.ai',
+                'X-OpenRouter-Title': 'menace-agent',
             },
             body: JSON.stringify({
                 model: modelToUse,
-                messages: [{ role: 'system', content: currentSystemPrompt || 'You are a helpful assistant.' }, ...groqConversationHistory],
+                messages: [{ role: 'system', content: currentSystemPrompt || 'You are a helpful assistant.' }, ...answerConversationHistory],
                 stream: true,
                 temperature: 0.7,
-                max_completion_tokens: GROQ_MAX_COMPLETION_TOKENS,
-                ...getGroqReasoningOptions(modelToUse, config.disableGroqThinking),
+                max_tokens: OPENROUTER_MAX_TOKENS,
             }),
         });
 
         if (!response.ok) {
             const errorText = await response.text();
-            console.error('Groq API error:', response.status, errorText);
-            logTransportEvent('groq.text.http_error', {
+            console.error('OpenRouter API error:', response.status, errorText);
+            logTransportEvent('openrouter.text.http_error', {
                 status: response.status,
                 body: errorText,
             });
-            sendToRenderer('update-status', `Groq error: ${response.status}`);
+            sendToRenderer('update-status', `OpenRouter error: ${response.status}`);
             return;
         }
 
-        logTransportEvent('groq.text.http_response', {
+        logTransportEvent('openrouter.text.http_response', {
             status: response.status,
         });
 
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let fullText = '';
-        let isFirst = true;
-        let finishReason = null;
-
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            const chunk = decoder.decode(value, { stream: true });
-            logTransportEvent('groq.text.stream_chunk', { chunk });
-            const lines = chunk.split('\n').filter(line => line.trim() !== '');
-
-            for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                    const data = line.slice(6);
-                    if (data === '[DONE]') continue;
-
-                    try {
-                        const json = JSON.parse(data);
-                        logTransportEvent('groq.text.stream_event', json);
-                        finishReason = json.choices?.[0]?.finish_reason || finishReason;
-                        const token = json.choices?.[0]?.delta?.content || '';
-                        if (token) {
-                            fullText += token;
-                            const displayText = stripThinkingTags(fullText);
-                            if (displayText) {
-                                sendToRenderer(isFirst ? 'new-response' : 'update-response', displayText);
-                                isFirst = false;
-                            }
-                        }
-                    } catch (parseError) {
-                        logTransportEvent('groq.text.stream_parse_error', {
-                            data,
-                            error: parseError.message,
-                        });
-                    }
-                }
-            }
-        }
+        const { fullText, finishReason } = await readOpenRouterSseStream(response, 'openrouter.text', (displayText, isFirst) => {
+            sendToRenderer(isFirst ? 'new-response' : 'update-response', displayText);
+        });
 
         const cleanedResponse = stripThinkingTags(fullText);
         const modelKey = modelToUse.split('/').pop();
 
         const systemPromptChars = (currentSystemPrompt || 'You are a helpful assistant.').length;
-        const historyChars = groqConversationHistory.reduce((sum, msg) => sum + (msg.content || '').length, 0);
+        const historyChars = answerConversationHistory.reduce((sum, msg) => sum + (msg.content || '').length, 0);
         const inputChars = systemPromptChars + historyChars;
         const outputChars = cleanedResponse.length;
 
-        incrementCharUsage('groq', modelKey, inputChars + outputChars);
+        incrementCharUsage('openrouter', modelKey, inputChars + outputChars);
 
         if (cleanedResponse) {
-            groqConversationHistory.push({
+            answerConversationHistory.push({
                 role: 'assistant',
                 content: cleanedResponse,
             });
 
             saveConversationTurn(transcription, cleanedResponse);
         } else {
-            console.warn(`Groq returned no final answer (${modelToUse})`);
-            logTransportEvent('groq.text.empty_response', {
+            console.warn(`OpenRouter returned no final answer (${modelToUse})`);
+            logTransportEvent('openrouter.text.empty_response', {
                 model: modelToUse,
                 fullText,
                 finishReason,
             });
-            sendToRenderer('new-response', GROQ_EMPTY_RESPONSE_MESSAGE);
-            sendToRenderer('update-status', 'Groq reached the completion-token limit');
+            sendToRenderer('new-response', OPENROUTER_EMPTY_RESPONSE_MESSAGE);
+            sendToRenderer('update-status', 'OpenRouter reached the token limit');
             return;
         }
 
-        logTransportEvent('groq.text.completed', {
+        logTransportEvent('openrouter.text.completed', {
             model: modelToUse,
             response: cleanedResponse,
         });
-        console.log(`Groq response completed (${modelToUse})`);
+        console.log(`OpenRouter response completed (${modelToUse})`);
         sendToRenderer('update-status', 'Listening...');
     } catch (error) {
-        console.error('Error calling Groq API:', error);
-        logTransportEvent('groq.text.error', {
+        console.error('Error calling OpenRouter API:', error);
+        logTransportEvent('openrouter.text.error', {
             error: error.message,
             stack: error.stack,
         });
-        sendToRenderer('update-status', 'Groq error: ' + error.message);
-    }
-}
-
-async function sendImageToGroq(base64Data, prompt) {
-    const groqApiKey = getGroqApiKey();
-    const config = getConfig();
-    const model = config.groqImageModel;
-
-    logTransportEvent('groq.image.request', {
-        model,
-        prompt,
-        imageBytes: Buffer.byteLength(base64Data, 'base64'),
-    });
-
-    try {
-        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                Authorization: `Bearer ${groqApiKey}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                model,
-                messages: [
-                    { role: 'system', content: currentSystemPrompt || 'You are a helpful assistant.' },
-                    {
-                        role: 'user',
-                        content: [
-                            { type: 'text', text: prompt },
-                            {
-                                type: 'image_url',
-                                image_url: {
-                                    url: `data:image/jpeg;base64,${base64Data}`,
-                                },
-                            },
-                        ],
-                    },
-                ],
-                stream: true,
-                temperature: 0.7,
-                max_completion_tokens: GROQ_MAX_COMPLETION_TOKENS,
-                ...getGroqReasoningOptions(model, config.disableGroqThinking),
-            }),
-        });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Groq image API error:', response.status, errorText);
-            logTransportEvent('groq.image.http_error', {
-                status: response.status,
-                body: errorText,
-            });
-            return { success: false, error: `Groq error: ${response.status}` };
-        }
-
-        logTransportEvent('groq.image.http_response', {
-            status: response.status,
-        });
-
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let fullText = '';
-        let isFirst = true;
-        let finishReason = null;
-
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            const chunk = decoder.decode(value, { stream: true });
-            logTransportEvent('groq.image.stream_chunk', { chunk });
-            const lines = chunk.split('\n').filter(line => line.trim() !== '');
-
-            for (const line of lines) {
-                if (!line.startsWith('data: ')) continue;
-
-                const data = line.slice(6);
-                if (data === '[DONE]') continue;
-
-                try {
-                    const json = JSON.parse(data);
-                    logTransportEvent('groq.image.stream_event', json);
-                    finishReason = json.choices?.[0]?.finish_reason || finishReason;
-                    const token = json.choices?.[0]?.delta?.content || '';
-                    if (!token) continue;
-
-                    fullText += token;
-                    const displayText = stripThinkingTags(fullText);
-                    if (displayText) {
-                        sendToRenderer(isFirst ? 'new-response' : 'update-response', displayText);
-                        isFirst = false;
-                    }
-                } catch (parseError) {
-                    logTransportEvent('groq.image.stream_parse_error', {
-                        data,
-                        error: parseError.message,
-                    });
-                }
-            }
-        }
-
-        const cleanedResponse = stripThinkingTags(fullText);
-        if (!cleanedResponse) {
-            logTransportEvent('groq.image.empty_response', {
-                model,
-                fullText,
-                finishReason,
-            });
-            return { success: false, error: GROQ_EMPTY_RESPONSE_MESSAGE };
-        }
-
-        saveScreenAnalysis(prompt, cleanedResponse, model);
-        logTransportEvent('groq.image.completed', {
-            model,
-            response: cleanedResponse,
-        });
-        return { success: true, text: cleanedResponse, model };
-    } catch (error) {
-        console.error('Error calling Groq image API:', error);
-        logTransportEvent('groq.image.error', {
-            error: error.message,
-            stack: error.stack,
-        });
-        return { success: false, error: error.message };
+        sendToRenderer('update-status', 'OpenRouter error: ' + error.message);
     }
 }
 
@@ -559,12 +445,12 @@ async function sendToGemma(transcription) {
 
     console.log('Sending to Gemma:', transcription.substring(0, 100) + '...');
 
-    groqConversationHistory.push({
+    answerConversationHistory.push({
         role: 'user',
         content: transcription.trim(),
     });
 
-    const trimmedHistory = trimConversationHistoryForGemma(groqConversationHistory, 42000);
+    const trimmedHistory = trimConversationHistoryForGemma(answerConversationHistory, 42000);
 
     try {
         const ai = new GoogleGenAI({ apiKey: apiKey });
@@ -606,13 +492,13 @@ async function sendToGemma(transcription) {
         incrementCharUsage('gemini', 'gemma-4-26b-a4b-it', inputChars + outputChars);
 
         if (fullText.trim()) {
-            groqConversationHistory.push({
+            answerConversationHistory.push({
                 role: 'assistant',
                 content: fullText.trim(),
             });
 
-            if (groqConversationHistory.length > 40) {
-                groqConversationHistory = groqConversationHistory.slice(-40);
+            if (answerConversationHistory.length > 40) {
+                answerConversationHistory = answerConversationHistory.slice(-40);
             }
 
             saveConversationTurn(transcription, fullText);
@@ -654,7 +540,7 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
     const googleSearchEnabled = enabledTools.some(tool => tool.googleSearch);
 
     const systemPrompt = getSystemPrompt(profile, customPrompt, googleSearchEnabled);
-    currentSystemPrompt = systemPrompt; // Store for Groq
+    currentSystemPrompt = systemPrompt; // Store for OpenRouter
 
     // Initialize new conversation session only on first connect
     if (!isReconnect) {
@@ -683,11 +569,7 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
                         }
                     }
 
-                    if (message.serverContent?.inputTranscription) {
-                        sendFinalTranscriptionToGroq();
-                    }
-
-                    if (!hasGroqKey() && message.serverContent?.outputTranscription?.text) {
+                    if (!hasOpenRouterKey() && message.serverContent?.outputTranscription?.text) {
                         const isFirstChunk = messageBuffer === '';
                         messageBuffer += message.serverContent.outputTranscription.text;
                         sendToRenderer(isFirstChunk ? 'new-response' : 'update-response', messageBuffer);
@@ -695,7 +577,7 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
 
                     if (message.serverContent?.generationComplete) {
                         if (currentTranscription.trim() !== '') {
-                            if (!hasGroqKey() && messageBuffer.trim() !== '') {
+                            if (!hasOpenRouterKey() && messageBuffer.trim() !== '') {
                                 saveConversationTurn(currentTranscription, messageBuffer);
                             }
                             currentTranscription = '';
@@ -704,9 +586,15 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
                     }
 
                     if (message.serverContent?.turnComplete) {
+                        // Wait for the full interviewer turn before calling OpenRouter —
+                        // firing on every partial transcription chunk caused repeat answers.
+                        sendFinalTranscriptionToOpenRouter();
                         currentTranscription = '';
                         messageBuffer = '';
-                        groqRequestStartedForTurn = false;
+                        // Reset after this turn is handed off so the next question can fire.
+                        queueMicrotask(() => {
+                            openRouterRequestStartedForTurn = false;
+                        });
                         sendToRenderer('update-status', 'Listening...');
                     }
                 },
@@ -742,7 +630,9 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
             },
             config: {
                 responseModalities: [Modality.AUDIO],
-                proactivity: { proactiveAudio: true },
+                // proactiveAudio invents interviewer questions (often from prompt examples)
+                // when the audio stream is quiet — keep it off for interview use.
+                proactivity: { proactiveAudio: false },
                 outputAudioTranscription: {},
                 tools: enabledTools,
                 // Enable speaker diarization
@@ -781,7 +671,7 @@ async function attemptReconnect() {
     // Clear stale buffers
     messageBuffer = '';
     currentTranscription = '';
-    // Don't reset groqConversationHistory to preserve context across reconnects
+    // Don't reset answerConversationHistory to preserve context across reconnects
 
     sendToRenderer('update-status', `Reconnecting... (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
 
@@ -839,7 +729,7 @@ function killExistingSystemAudioDump() {
     return new Promise(resolve => {
         console.log('Checking for existing SystemAudioDump processes...');
 
-        // Kill any existing SystemAudioDump processes
+        // Kill any existing SystemAudioDump processes (including the helper .app binary)
         const killProc = spawn('pkill', ['-f', 'SystemAudioDump'], {
             stdio: 'ignore',
         });
@@ -866,6 +756,39 @@ function killExistingSystemAudioDump() {
     });
 }
 
+function resolveMacOSSystemAudioDumpPath() {
+    const { app } = require('electron');
+    const fs = require('fs');
+    const path = require('path');
+
+    // On macOS 26+, SystemAudioDump can report permissions OK while streaming
+    // silence unless it is attributed to an app that has Screen/System Audio
+    // Recording permission. Prefer helpers inside the host .app bundle first.
+    const electronHelper = path.join(path.dirname(process.execPath), '..', 'Helpers', 'SystemAudioDump');
+
+    const candidates = app.isPackaged
+        ? [
+              path.join(process.resourcesPath, 'CheatingDaddyAudio.app', 'Contents', 'MacOS', 'CheatingDaddyAudio'),
+              path.join(process.resourcesPath, 'CheatingDaddyAudio.app', 'Contents', 'MacOS', 'SystemAudioDump'),
+              path.join(process.resourcesPath, 'SystemAudioDump'),
+              electronHelper,
+          ]
+        : [
+              electronHelper,
+              path.join(__dirname, '../assets/CheatingDaddyAudio.app/Contents/MacOS/CheatingDaddyAudio'),
+              path.join(__dirname, '../assets/CheatingDaddyAudio.app/Contents/MacOS/SystemAudioDump'),
+              path.join(__dirname, '../assets/SystemAudioDump'),
+          ];
+
+    for (const candidate of candidates) {
+        if (fs.existsSync(candidate)) {
+            return candidate;
+        }
+    }
+
+    return candidates[candidates.length - 1];
+}
+
 async function startMacOSAudioCapture(geminiSessionRef) {
     if (process.platform !== 'darwin') return false;
 
@@ -874,15 +797,7 @@ async function startMacOSAudioCapture(geminiSessionRef) {
 
     console.log('Starting macOS audio capture with SystemAudioDump...');
 
-    const { app } = require('electron');
-    const path = require('path');
-
-    let systemAudioPath;
-    if (app.isPackaged) {
-        systemAudioPath = path.join(process.resourcesPath, 'SystemAudioDump');
-    } else {
-        systemAudioPath = path.join(__dirname, '../assets', 'SystemAudioDump');
-    }
+    const systemAudioPath = resolveMacOSSystemAudioDumpPath();
 
     console.log('SystemAudioDump path:', systemAudioPath);
 
@@ -921,7 +836,7 @@ async function startMacOSAudioCapture(geminiSessionRef) {
 
             if (currentProviderMode === 'cloud') {
                 sendCloudAudio(monoChunk);
-            } else if (currentProviderMode === 'local') {
+            } else if (usesLocalWhisper()) {
                 getLocalAi().processLocalAudio(monoChunk);
             } else {
                 const base64Data = monoChunk.toString('base64');
@@ -993,13 +908,84 @@ async function sendAudioToGemini(base64Data, geminiSessionRef) {
     }
 }
 
+async function sendImageToOpenRouter(base64Data, prompt) {
+    const openRouterApiKey = getEffectiveOpenRouterApiKey();
+    if (!openRouterApiKey) {
+        return {
+            success: false,
+            error: 'Screen context is unavailable. Use a pass with included AI, or add a Gemini API key on the home screen.',
+        };
+    }
+
+    const model = OPENROUTER_VISION_MODEL;
+
+    try {
+        console.log(`Sending image to OpenRouter (${model}, streaming)...`);
+        logTransportEvent('openrouter.vision.request', { model, prompt });
+
+        const response = await fetch(OPENROUTER_API_URL, {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${openRouterApiKey}`,
+                'Content-Type': 'application/json',
+                'HTTP-Referer': 'https://openrouter.ai',
+                'X-OpenRouter-Title': 'menace-agent',
+            },
+            body: JSON.stringify({
+                model,
+                messages: [
+                    { role: 'system', content: currentSystemPrompt || 'You are a helpful assistant.' },
+                    {
+                        role: 'user',
+                        content: [
+                            { type: 'text', text: prompt },
+                            {
+                                type: 'image_url',
+                                image_url: { url: `data:image/jpeg;base64,${base64Data}` },
+                            },
+                        ],
+                    },
+                ],
+                stream: true,
+                max_tokens: OPENROUTER_MAX_TOKENS,
+            }),
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('OpenRouter vision API error:', response.status, errorText);
+            logTransportEvent('openrouter.vision.http_error', { status: response.status, body: errorText });
+            return { success: false, error: `OpenRouter error: ${response.status}` };
+        }
+
+        const { fullText } = await readOpenRouterSseStream(response, 'openrouter.vision', (displayText, isFirst) => {
+            sendToRenderer(isFirst ? 'new-response' : 'update-response', displayText);
+        });
+
+        const cleanedResponse = stripThinkingTags(fullText);
+        const modelKey = model.split('/').pop();
+        incrementCharUsage('openrouter', modelKey, prompt.length + cleanedResponse.length);
+
+        if (cleanedResponse) {
+            saveScreenAnalysis(prompt, cleanedResponse, model);
+        }
+
+        console.log(`Image response completed from OpenRouter (${model})`);
+        return { success: true, text: cleanedResponse, model };
+    } catch (error) {
+        console.error('Error sending image to OpenRouter:', error);
+        logTransportEvent('openrouter.vision.error', { error: error.message });
+        return { success: false, error: error.message };
+    }
+}
+
 async function sendImageToGeminiHttp(base64Data, prompt) {
     // Get available model based on rate limits
     const model = getAvailableModel();
 
     const apiKey = getApiKey();
     if (!apiKey) {
-        return { success: false, error: 'No API key configured' };
+        return await sendImageToOpenRouter(base64Data, prompt);
     }
 
     try {
@@ -1054,6 +1040,10 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
     global.geminiSessionRef = geminiSessionRef;
 
     ipcMain.handle('initialize-cloud', async (event, token, profile, userContext) => {
+        if (!(await ensureLicensedSession())) {
+            return false;
+        }
+
         try {
             currentProviderMode = 'cloud';
             initializeNewSession(profile);
@@ -1073,6 +1063,10 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
     });
 
     ipcMain.handle('initialize-gemini', async (event, apiKey, customPrompt, profile = 'interview', language = 'en-US') => {
+        if (!(await ensureLicensedSession())) {
+            return false;
+        }
+
         currentProviderMode = 'byok';
         const session = await initializeGeminiSession(apiKey, customPrompt, profile, language);
         if (session) {
@@ -1083,10 +1077,37 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
     });
 
     ipcMain.handle('initialize-local', async (event, localLlmModel, whisperModel, profile, customPrompt) => {
+        if (!(await ensureLicensedSession())) {
+            return false;
+        }
+
         currentProviderMode = 'local';
         const success = await getLocalAi().initializeLocalSession(localLlmModel, whisperModel, profile, customPrompt);
         if (!success) {
             currentProviderMode = 'byok';
+        }
+        return success;
+    });
+
+    ipcMain.handle('initialize-whisper-openrouter', async (event, whisperModel, profile, customPrompt) => {
+        if (!(await ensureLicensedSession())) {
+            return false;
+        }
+
+        if (!hasOpenRouterKey()) {
+            sendToRenderer(
+                'update-status',
+                'Add your OpenRouter key on the home screen, or choose a pass with included AI.'
+            );
+            return false;
+        }
+
+        currentProviderMode = 'whisper_openrouter';
+        currentSystemPrompt = getSystemPrompt(profile, customPrompt || '', false);
+        const success = await getLocalAi().initializeWhisperOpenRouterSession(whisperModel, profile, customPrompt || '');
+        if (!success) {
+            currentProviderMode = 'byok';
+            currentSystemPrompt = null;
         }
         return success;
     });
@@ -1110,7 +1131,7 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
                 return { success: false, error: error.message };
             }
         }
-        if (currentProviderMode === 'local') {
+        if (usesLocalWhisper()) {
             try {
                 const pcmBuffer = Buffer.from(data, 'base64');
                 getLocalAi().processLocalAudio(pcmBuffer);
@@ -1145,7 +1166,7 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
                 return { success: false, error: error.message };
             }
         }
-        if (currentProviderMode === 'local') {
+        if (usesLocalWhisper()) {
             try {
                 const pcmBuffer = Buffer.from(data, 'base64');
                 getLocalAi().processLocalAudio(pcmBuffer);
@@ -1197,7 +1218,16 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
                 return result;
             }
 
-            const result = hasGroqKey() ? await sendImageToGroq(data, prompt) : await sendImageToGeminiHttp(data, prompt);
+            if (currentProviderMode === 'whisper_openrouter') {
+                const geminiKey = getApiKey();
+                if (geminiKey) {
+                    return await sendImageToGeminiHttp(data, prompt);
+                }
+                return await sendImageToOpenRouter(data, prompt);
+            }
+
+            // Gemini Live / BYOK: prefer direct Gemini HTTP when a key is configured.
+            const result = await sendImageToGeminiHttp(data, prompt);
             return result;
         } catch (error) {
             console.error('Error sending image:', error);
@@ -1221,12 +1251,17 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
             }
         }
 
-        if (currentProviderMode === 'local') {
+        if (usesLocalWhisper()) {
             try {
-                console.log('Sending text to local Llama:', text);
+                console.log(
+                    currentProviderMode === 'whisper_openrouter'
+                        ? 'Sending text via Whisper+OpenRouter path:'
+                        : 'Sending text to local Llama:',
+                    text
+                );
                 return await getLocalAi().sendLocalText(text.trim());
             } catch (error) {
-                console.error('Error sending local text:', error);
+                console.error('Error sending local/hybrid text:', error);
                 return { success: false, error: error.message };
             }
         }
@@ -1236,9 +1271,9 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
         try {
             console.log('Sending text message:', text);
 
-            if (hasGroqKey()) {
-                groqRequestStartedForTurn = true;
-                sendToGroq(text.trim());
+            if (hasOpenRouterKey()) {
+                openRouterRequestStartedForTurn = true;
+                sendToOpenRouter(text.trim());
             }
 
             await geminiSessionRef.current.sendRealtimeInput({ text: text.trim() });
@@ -1287,7 +1322,7 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
                 return { success: true };
             }
 
-            if (currentProviderMode === 'local') {
+            if (usesLocalWhisper()) {
                 getLocalAi().closeLocalSession();
                 currentProviderMode = 'byok';
                 closeTransportLog();
@@ -1360,6 +1395,7 @@ module.exports = {
     stopMacOSAudioCapture,
     sendAudioToGemini,
     sendImageToGeminiHttp,
+    sendToOpenRouter,
     setupGeminiIpcHandlers,
     formatSpeakerResults,
 };

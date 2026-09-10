@@ -73,13 +73,16 @@ export class HelpView extends LitElement {
                 color: var(--text-primary);
                 font-size: var(--font-size-sm);
                 cursor: pointer;
-                transition: border-color var(--transition), color var(--transition), background var(--transition);
+                transition:
+                    border-color var(--transition),
+                    color var(--transition),
+                    background var(--transition);
             }
 
             .link-button:hover {
                 color: var(--text-primary);
-                border-color: var(--accent);
-                background: rgba(63, 125, 229, 0.14);
+                border-color: var(--border);
+                background: var(--bg-hover);
             }
 
             @media (max-width: 820px) {
@@ -87,7 +90,6 @@ export class HelpView extends LitElement {
                     grid-template-columns: 1fr;
                 }
             }
-
         `,
     ];
 
@@ -161,23 +163,39 @@ export class HelpView extends LitElement {
                     <div class="page-title">Help</div>
 
                     <section class="surface">
-                        <div class="surface-title">Support</div>
+                        <div class="surface-title">Getting started</div>
+                        <div class="list">
+                            <div class="list-item">1. Unlock with a pass on the License page — required for every session.</div>
+                            <div class="list-item">2. Full passes include AI. BYOK passes need your Gemini and OpenRouter keys on Home.</div>
+                            <div class="list-item">3. Press Start on Home, then use the overlay during your call.</div>
+                        </div>
+                    </section>
+
+                    <section class="surface">
+                        <div class="surface-title">Links</div>
                         <div class="link-row">
-                            <button class="link-button" @click=${() => this._open('https://cheatingdaddy.com')}>Website</button>
-                            <button class="link-button" @click=${() => this._open('https://github.com/sohzm/cheating-daddy')}>GitHub</button>
-                            <button class="link-button" @click=${() => this._open('https://discord.gg/GCBdubnXfJ')}>Discord</button>
+                            <button
+                                class="link-button"
+                                @click=${() => this._open('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture')}
+                            >
+                                macOS screen privacy
+                            </button>
+                            <button class="link-button" @click=${() => this._open('https://aistudio.google.com/apikey')}>Gemini API keys</button>
+                            <button class="link-button" @click=${() => this._open('https://openrouter.ai/keys')}>OpenRouter API keys</button>
                         </div>
                     </section>
 
                     <section class="surface">
                         <div class="surface-title">Keyboard Shortcuts</div>
                         <div class="shortcut-grid">
-                            ${shortcutRows.map(([label, keys]) => html`
-                                <div class="shortcut-row">
-                                    <span class="shortcut-label">${label}</span>
-                                    <span class="shortcut-keys">${this._formatKeybind(keys)}</span>
-                                </div>
-                            `)}
+                            ${shortcutRows.map(
+                                ([label, keys]) => html`
+                                    <div class="shortcut-row">
+                                        <span class="shortcut-label">${label}</span>
+                                        <span class="shortcut-keys">${this._formatKeybind(keys)}</span>
+                                    </div>
+                                `
+                            )}
                         </div>
                     </section>
                 </div>

@@ -1,60 +1,97 @@
-<img width="1299" height="424" alt="cd (1)" src="https://github.com/user-attachments/assets/b25fff4d-043d-4f38-9985-f832ae0d0f6e" />
+# Menace Agent
 
-## Recall.ai - API for desktop recording
+A live interview autocue for macOS. It listens with local Whisper, answers through your OpenRouter key, and collapses into a compact always-on-top prompter once a session starts.
 
-If you’re looking for a hosted desktop recording API, consider checking out [Recall.ai](https://www.recall.ai/product/desktop-recording-sdk/?utm_source=github&utm_medium=sponsorship&utm_campaign=sohzm-cheating-daddy), an API that records Zoom, Google Meet, Microsoft Teams, in-person meetings, and more.
+> [!NOTE]
+> Use the latest macOS. Older versions have limited system-audio support.
 
-This project is sponsored by Recall.ai.
-
----
-
-> [!NOTE]  
-> Use latest MacOS and Windows version, older versions have limited support
-
-> [!NOTE]  
-> During testing it wont answer if you ask something, you need to simulate interviewer asking question, which it will answer
-
-A real-time AI assistant that provides contextual help during video calls, interviews, presentations, and meetings using screen capture and audio analysis.
+> [!NOTE]
+> During testing it will not answer if you ask something yourself. Simulate an interviewer asking a question — that is what it answers.
 
 ## Features
 
-- **Live AI Assistance**: Real-time help powered by Google Gemini 2.0 Flash Live
-- **Screen & Audio Capture**: Analyzes what you see and hear for contextual responses
-- **Multiple Profiles**: Interview, Sales Call, Business Meeting, Presentation, Negotiation
-- **Transparent Overlay**: Always-on-top window that can be positioned anywhere
-- **Click-through Mode**: Make window transparent to clicks when needed
-- **Cross-platform**: Works on macOS, Windows, and Linux (kinda, dont use, just for testing rn)
+- **Included AI + local Whisper**: paid users get hosted answers; on-device transcription
+- **Screen & audio capture**: contextual help from what you see and hear
+- **Profiles**: Interview (default), Sales Call, Business Meeting, Presentation, Negotiation
+- **Talent autocue overlay**: compact always-on-top window with click-through
+- **First-run setup**: activate your pass, grant macOS permissions, optional resume context
 
-## Setup
+## Setup (development)
 
-1. **Get a Gemini API Key**: Visit [Google AI Studio](https://aistudio.google.com/apikey)
-2. **Install Dependencies**: `npm install`
-3. **Run the App**: `npm start`
+1. Copy `.env.example` to `.env` and set `OPENROUTER_API_KEY` (powers included AI for licensed users)
+2. `npm install`
+3. `npm start` or on macOS `npm run start:macos`
+
+For local testing without Polar, set `MENACE_SKIP_LICENSE=1` in `.env`.
+
+### Polar production
+
+1. Create the **Menace** org and products on [polar.sh](https://polar.sh) (not sandbox).
+2. Add your production org token to `.env`:
+
+   ```
+   POLAR_ACCESS_TOKEN=polar_pat_...
+   POLAR_SERVER=production
+   ```
+
+3. Sync checkout URLs into the app:
+
+   ```
+   npm run polar:sync
+   ```
+
+4. Verify hosted AI + license path:
+
+   ```
+   npm run test:license-flow
+   # or, after a real checkout:
+   npm run test:license-flow -- MENACE_your_key_here
+   ```
+
+## Production macOS install
+
+```bash
+# OPENROUTER_API_KEY must be set in .env (or the shell) so packaged builds include hosted AI
+npm run package:macos
+npm run install:macos
+```
+
+The packaged app installs to `~/Applications/Menace Agent.app`. Enable it under **System Settings → Privacy & Security → Screen & System Audio Recording** (and **System Audio Recording Only** on macOS 26+).
+
+To build a distributable DMG:
+
+```bash
+npm run make:macos
+```
+
+Artifacts land in `out/`.
 
 ## Usage
 
-1. Enter your Gemini API key in the main window
-2. Choose your profile and language in settings
-3. Click "Start Session" to begin
-4. Position the window using keyboard shortcuts
-5. The AI will provide real-time assistance based on your screen and what interview asks
+1. Complete onboarding (activate pass + permissions)
+2. Confirm Whisper model on Home (default: Base English)
+3. Click **Start Session**
+4. Position the compact overlay with keyboard shortcuts
+5. Speak from the ready-to-say lines while the interviewer talks
 
 ## Keyboard Shortcuts
 
-- **Window Movement**: `Ctrl/Cmd + Arrow Keys` - Move window
-- **Click-through**: `Ctrl/Cmd + M` - Toggle mouse events
-- **Close/Back**: `Ctrl/Cmd + \` - Close window or go back
-- **Send Message**: `Enter` - Send text to AI
+- **Window Movement**: `Ctrl/Cmd + Arrow Keys`
+- **Click-through**: `Ctrl/Cmd + M`
+- **Close/Back**: `Ctrl/Cmd + \`
+- **Send Message**: `Enter`
 
 ## Audio Capture
 
-- **macOS**: [SystemAudioDump](https://github.com/Mohammed-Yasin-Mulla/Sound) for system audio
+- **macOS**: SystemAudioDump helper for system audio
 - **Windows**: Loopback audio capture
 - **Linux**: Microphone input
 
+On **macOS 26+**, interviewer audio needs **System Settings → Privacy & Security → Screen & System Audio Recording**. When running with `npm start`, enable **Electron** (not only the packaged Menace Agent app). If capture stays silent, also check **System Audio Recording Only**.
+
 ## Requirements
 
-- Electron-compatible OS (macOS, Windows, Linux)
-- Gemini API key
+- macOS (primary), Windows/Linux secondary
+- Active Menace Agent pass (or `MENACE_SKIP_LICENSE=1` in dev)
 - Screen recording permissions
-- Microphone/audio permissions
+- Microphone/audio permissions when mic mode is enabled

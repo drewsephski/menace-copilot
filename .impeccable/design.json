@@ -1,0 +1,251 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-02T21:45:00.000Z",
+  "title": "Design System: Menace Agent",
+  "extensions": {
+    "colorMeta": {
+      "hood": {
+        "role": "neutral",
+        "displayName": "Hood Black",
+        "canonical": "#0b0b0b",
+        "tonalRamp": ["#0b0b0b", "#121212", "#1a1a1a", "#222222", "#3a3a3a", "#5c5c56", "#a8a89e", "#f7f7f2"]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Surface Plate",
+        "canonical": "#121212",
+        "tonalRamp": ["#0b0b0b", "#121212", "#1a1a1a", "#222222", "#2a2a2a", "#3a3a3a", "#5c5c56", "#a8a89e"]
+      },
+      "elevated": {
+        "role": "neutral",
+        "displayName": "Elevated",
+        "canonical": "#1a1a1a",
+        "tonalRamp": ["#0b0b0b", "#121212", "#1a1a1a", "#222222", "#2a2a2a", "#3a3a3a", "#5c5c56", "#a8a89e"]
+      },
+      "hover": {
+        "role": "neutral",
+        "displayName": "Hover Wash",
+        "canonical": "#222222",
+        "tonalRamp": ["#0b0b0b", "#121212", "#1a1a1a", "#222222", "#2e2e2e", "#3a3a3a", "#5c5c56", "#a8a89e"]
+      },
+      "cream": {
+        "role": "neutral",
+        "displayName": "Cream",
+        "canonical": "#f7f7f2",
+        "tonalRamp": ["#2a2a26", "#4a4a44", "#6e6e66", "#9a9a92", "#c4c4bc", "#e4e4dc", "#f0f0ea", "#f7f7f2"]
+      },
+      "secondary": {
+        "role": "neutral",
+        "displayName": "Secondary",
+        "canonical": "#a8a89e",
+        "tonalRamp": ["#2a2a26", "#3a3a36", "#5c5c56", "#7a7a72", "#a8a89e", "#c4c4bc", "#e4e4dc", "#f7f7f2"]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted",
+        "canonical": "#5c5c56",
+        "tonalRamp": ["#1a1a18", "#2a2a26", "#3a3a36", "#5c5c56", "#7a7a72", "#a8a89e", "#c4c4bc", "#e4e4dc"]
+      },
+      "border": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "rgba(247, 247, 242, 0.08)",
+        "tonalRamp": ["#0b0b0b", "#121212", "#1a1a1a", "#262626", "#3a3a3a", "#5c5c56", "#a8a89e", "#f7f7f2"]
+      },
+      "chrome": {
+        "role": "neutral",
+        "displayName": "Dim Chrome",
+        "canonical": "rgba(247, 247, 242, 0.14)",
+        "tonalRamp": ["#121212", "#1a1a1a", "#262626", "#3a3a3a", "#4a4a44", "#5c5c56", "#a8a89e", "#c4c4bc"]
+      },
+      "tally": {
+        "role": "primary",
+        "displayName": "Tally Red",
+        "canonical": "#c41e3a",
+        "tonalRamp": ["#3a151c", "#5c1824", "#8a1a2c", "#a81830", "#c41e3a", "#d94a58", "#e88892", "#f3c4c8"]
+      },
+      "tally-hover": {
+        "role": "primary",
+        "displayName": "Tally Hover",
+        "canonical": "#a81830",
+        "tonalRamp": ["#3a151c", "#5c1824", "#7a1528", "#a81830", "#c41e3a", "#d94a58", "#e88892", "#f3c4c8"]
+      },
+      "tally-dim": {
+        "role": "primary",
+        "displayName": "Tally Dim",
+        "canonical": "#3a151c",
+        "tonalRamp": ["#1a080c", "#3a151c", "#5c1824", "#8a1a2c", "#a81830", "#c41e3a", "#d94a58", "#e88892"]
+      },
+      "tally-glow": {
+        "role": "primary",
+        "displayName": "Tally Glow",
+        "canonical": "rgba(196, 30, 58, 0.35)",
+        "tonalRamp": ["#3a151c", "#5c1824", "#8a1a2c", "#a81830", "#c41e3a", "#d94a58", "#e88892", "#f3c4c8"]
+      },
+      "success": {
+        "role": "tertiary",
+        "displayName": "Status Green",
+        "canonical": "#5aab6e",
+        "tonalRamp": ["#142418", "#1e3a26", "#2e5c3a", "#3d8a52", "#5aab6e", "#86c494", "#b5dcbd", "#dceee0"]
+      },
+      "warning": {
+        "role": "secondary",
+        "displayName": "Status Amber",
+        "canonical": "#d4a017",
+        "tonalRamp": ["#2a2208", "#4a380c", "#7a5a10", "#a88814", "#d4a017", "#e0bc52", "#ecd48a", "#f6ebc8"]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Onboarding slide titles — one large cream instruction on the hood." },
+      "headline": { "displayName": "Headline", "purpose": "Setup and settings page titles." },
+      "title": { "displayName": "Title", "purpose": "Sidebar wordmark, section titles, header title." },
+      "body": { "displayName": "Body", "purpose": "Default UI copy. Supporting slide text at 13px on secondary." },
+      "label": { "displayName": "Label", "purpose": "Uppercase tracked status and field names: KEY, WHISPER, ON AIR." },
+      "prompter": { "displayName": "Prompter", "purpose": "Live ready-to-speak answers. The session’s only large type." },
+      "mono": { "displayName": "Mono", "purpose": "Keycaps, response counters, live elapsed time." }
+    },
+    "shadows": [
+      {
+        "name": "tally-lamp",
+        "value": "0 0 12px rgba(196, 30, 58, 0.35)",
+        "purpose": "Lit camera tally only (onboarding 10px lamp). Live ON AIR uses 0 0 10px of the same glow."
+      },
+      {
+        "name": "tally-unlit-inset",
+        "value": "inset 0 0 0 1px rgba(196, 30, 58, 0.35)",
+        "purpose": "Unlit tally ring on tally-dim. Not a card treatment."
+      },
+      {
+        "name": "focus-ring",
+        "value": "0 0 0 1px #c41e3a",
+        "purpose": "Settings/form control focus. Onboarding fields use border-color only. Document focus-visible is a 2px outline, 2px offset."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-standard",
+        "value": "150ms ease",
+        "purpose": "Default state transition (background, border, color). Overlay header uses 100ms."
+      }
+    ],
+    "breakpoints": [
+      { "name": "settings-compact", "value": "640px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Tally-filled go action: Continue, Save key, Get on air.",
+      "html": "<button class=\"ds-btn-primary\" type=\"button\">Get on air</button>",
+      "css": ".ds-btn-primary { background: var(--tally); border: none; color: var(--text-primary); font-family: var(--font); font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold); padding: 12px 16px; border-radius: var(--radius-sm); cursor: pointer; letter-spacing: 0.02em; width: 100%; appearance: none; -webkit-appearance: none; transition: background-color 150ms ease; } .ds-btn-primary:hover { background: var(--tally-hover); color: var(--text-primary); } .ds-btn-primary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; } .ds-btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Back / skip text control under a primary plate.",
+      "html": "<button class=\"ds-btn-ghost\" type=\"button\">Back</button>",
+      "css": ".ds-btn-ghost { background: transparent; border: none; color: var(--text-muted); font-family: var(--font); font-size: var(--font-size-sm); cursor: pointer; padding: 8px; } .ds-btn-ghost:hover { color: var(--text-secondary); } .ds-btn-ghost:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }"
+    },
+    {
+      "name": "Header Button",
+      "kind": "button",
+      "refersTo": "button-header",
+      "description": "Overlay chrome action on the session header.",
+      "html": "<button class=\"ds-btn-header\" type=\"button\">Hide</button>",
+      "css": ".ds-btn-header { background: transparent; color: var(--text-primary); border: 1px solid var(--border); padding: 6px 12px; border-radius: 3px; font-family: var(--font); font-size: 12px; font-weight: 500; cursor: pointer; transition: background 0.1s ease; } .ds-btn-header:hover { background: var(--hover-background); } .ds-btn-header:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }"
+    },
+    {
+      "name": "Key Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Elevated plate field for OpenRouter key and context.",
+      "html": "<label class=\"ds-field\"><span class=\"ds-field-label\">OpenRouter API key</span><input class=\"ds-input\" type=\"password\" placeholder=\"sk-or-...\" aria-label=\"OpenRouter API key\"></label>",
+      "css": ".ds-field { display: flex; flex-direction: column; gap: 6px; } .ds-field-label { font-family: var(--font); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); font-weight: var(--font-weight-semibold); } .ds-input { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-elevated); color: var(--text-primary); font-size: var(--font-size-sm); font-family: var(--font); line-height: var(--line-height); } .ds-input::placeholder { color: var(--text-muted); } .ds-input:focus { outline: none; border-color: var(--accent); } .ds-input:focus-visible { outline: none; border-color: var(--accent); }"
+    },
+    {
+      "name": "Edge Plate",
+      "kind": "card",
+      "refersTo": "plate",
+      "description": "KEY / WHISPER hardware labels on the onboarding hood.",
+      "html": "<div class=\"ds-plates\"><div class=\"ds-plate\"><div class=\"ds-plate-name\">Key</div><div class=\"ds-plate-body\">OpenRouter</div></div><div class=\"ds-plate\"><div class=\"ds-plate-name\">Whisper</div><div class=\"ds-plate-body\">Local base.en</div></div></div>",
+      "css": ".ds-plates { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; } .ds-plate { border: 1px solid var(--border); background: var(--bg-surface); border-radius: var(--radius-sm); padding: 10px 12px; } .ds-plate-name { font-family: var(--font); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); font-weight: var(--font-weight-semibold); margin-bottom: 4px; } .ds-plate-body { font-family: var(--font); font-size: var(--font-size-sm); color: var(--text-primary); }"
+    },
+    {
+      "name": "Surface Card",
+      "kind": "card",
+      "refersTo": "surface",
+      "description": "Settings plate: chrome edge, surface fill, 16px pad.",
+      "html": "<section class=\"ds-surface\"><div class=\"ds-surface-title\">Session</div><p class=\"ds-surface-sub\">Interview is the default profile.</p></section>",
+      "css": ".ds-surface { border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-surface); padding: var(--space-md); } .ds-surface-title { color: var(--text-primary); font-family: var(--font); font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold); margin: 0 0 4px; } .ds-surface-sub { color: var(--text-muted); font-family: var(--font); font-size: var(--font-size-xs); margin: 0; }"
+    },
+    {
+      "name": "Sidebar Nav",
+      "kind": "nav",
+      "refersTo": "nav-item",
+      "description": "Setup-window rail. Active is elevated cream, never tally fill.",
+      "html": "<nav class=\"ds-nav\"><button class=\"ds-nav-item ds-nav-item-active\" type=\"button\"><svg viewBox=\"0 0 24 24\" width=\"20\" height=\"20\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"8\"/><circle cx=\"12\" cy=\"12\" r=\"2.5\" fill=\"currentColor\" stroke=\"none\"/></svg>Home</button><button class=\"ds-nav-item\" type=\"button\"><svg viewBox=\"0 0 24 24\" width=\"20\" height=\"20\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" aria-hidden=\"true\"><rect x=\"5\" y=\"5\" width=\"14\" height=\"14\" rx=\"2\"/></svg>Customize</button></nav>",
+      "css": ".ds-nav { display: flex; flex-direction: column; gap: 4px; } .ds-nav-item { display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: var(--radius-md); color: var(--text-secondary); font-family: var(--font); font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); cursor: pointer; border: none; background: none; width: 100%; text-align: left; transition: color 150ms ease, background 150ms ease; } .ds-nav-item:hover { color: var(--text-primary); background: var(--bg-hover); } .ds-nav-item-active { color: var(--text-primary); background: var(--bg-elevated); } .ds-nav-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; } .ds-nav-item svg { flex-shrink: 0; }"
+    },
+    {
+      "name": "Mono Chip",
+      "kind": "chip",
+      "refersTo": "chip",
+      "description": "Machine tag / keycap on elevated fill.",
+      "html": "<span class=\"ds-chip\">⌘G</span>",
+      "css": ".ds-chip { display: inline-flex; align-items: center; border-radius: var(--radius-sm); background: var(--bg-elevated); color: var(--text-secondary); padding: 2px 8px; font-size: var(--font-size-xs); font-family: var(--font-mono); }"
+    },
+    {
+      "name": "Prompter Input Bar",
+      "kind": "input",
+      "refersTo": "input-bar",
+      "description": "Live talkback strip: 32px pill on the hood.",
+      "html": "<div class=\"ds-input-bar\"><div class=\"ds-input-bar-inner\"><input type=\"text\" placeholder=\"Type a question…\" aria-label=\"Ask\"></div><button class=\"ds-analyze\" type=\"button\">Analyze</button></div>",
+      "css": ".ds-input-bar { display: flex; align-items: center; gap: 8px; padding: 16px; background: var(--bg-app); } .ds-input-bar-inner { display: flex; align-items: center; flex: 1; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 100px; padding: 0 16px; height: 32px; transition: border-color 150ms ease; } .ds-input-bar-inner:focus-within { border-color: var(--accent); } .ds-input-bar-inner input { flex: 1; background: none; color: var(--text-primary); border: none; padding: 0; font-size: var(--font-size-sm); font-family: var(--font); height: 100%; outline: none; } .ds-input-bar-inner input::placeholder { color: var(--text-muted); } .ds-analyze { background: var(--bg-elevated); border: 1px solid var(--border); color: var(--text-primary); cursor: pointer; font-size: var(--font-size-xs); font-family: var(--font-mono); white-space: nowrap; padding: 4px 16px; border-radius: 100px; height: 32px; transition: border-color 150ms ease, background 150ms ease; } .ds-analyze:hover { border-color: var(--accent); background: var(--bg-surface); } .ds-analyze:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }"
+    },
+    {
+      "name": "Tally / ON AIR",
+      "kind": "custom",
+      "refersTo": "tally-lit",
+      "description": "Camera lamp + tracked status. Lit on live; dim on standby.",
+      "html": "<div class=\"ds-tally-row\"><span class=\"ds-tally ds-tally-lit\" aria-hidden=\"true\"></span><span class=\"ds-tally-label\">On air</span></div>",
+      "css": ".ds-tally-row { display: flex; align-items: center; gap: 6px; } .ds-tally { width: 10px; height: 10px; border-radius: 50%; background: var(--tally-dim); box-shadow: inset 0 0 0 1px rgba(196, 30, 58, 0.35); } .ds-tally-lit { background: var(--tally); box-shadow: 0 0 12px var(--tally-glow); } .ds-tally-label { font-family: var(--font); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-primary); font-weight: var(--font-weight-semibold); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Talent Autocue",
+    "overview": "Menace Agent is a newsroom teleprompter in a Mac window: a matte black hood, cream-white copy, and a single red camera tally. Setup is a centered board of hairline plates (KEY, WHISPER, permissions). Once the session starts, the app collapses into a compact always-on-top strip whose job is ready-to-speak lines — not a copilot dashboard.\n\nThe material is opaque metal and matte plastic, not glass. Edges are cream at 8–14% opacity — a bezel that catches light, not a drawn box. Type is the Mac’s own sans, set like a prompter: one large instruction on the hood, then 20px medium lines you can read aloud while the call stays in front. Personality stays dry and on-air, not corporate and not neon-AI.",
+    "keyCharacteristics": [
+      "Matte hood black with cream type and a scarce red tally",
+      "Hairline cream bezels; no glass, blur, or gradient-mesh chrome",
+      "System sans as the only display/body face; mono only for keys and counters",
+      "Window rounded as a hood (12px); plates stay tight (4px)",
+      "Depth from tonal steps and the tally lamp, not drop shadows or hard outlines"
+    ],
+    "rules": [
+      { "name": "The Tally Rule", "body": "Red is the lamp and the go button. It does not fill sidebars, cards, or large fields. If a screen has more than one solid red rectangle, the lamp has been overused.", "section": "colors" },
+      { "name": "The Four-Ink Rule", "body": "Hood, cream, hairline, tally. Do not add a fifth brand hue. Success and warning stay in status notes.", "section": "colors" },
+      { "name": "The Prompter Face Rule", "body": "One system sans for everything a candidate reads. Do not introduce a display serif, a geometric AI sans, or a second UI family. Mono is for machine text only.", "section": "typography" },
+      { "name": "The Ready-to-Speak Rule", "body": "Live answers are 20px medium cream on hood. Do not drop session copy to body size to “fit more dashboard.”", "section": "typography" },
+      { "name": "The Hairline Bezel Rule", "body": "Opaque fill + cream-at-8% 1px edge. No solid gray chrome, no backdrop-filter, no frosted fill, no multi-stop brand gradients. If it looks like a drawn box or like glass, it is wrong.", "section": "elevation" },
+      { "name": "The Lamp-Only Glow Rule", "body": "box-shadow exists for the tally dot. Not for buttons, plates, or nav.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do set cream type on hood black, and keep the red lamp scarce.",
+      "Do edge plates with cream-at-8% hairlines and 4px corners; depth comes from fill steps.",
+      "Do use one system-sans stack; set live answers at 20px medium.",
+      "Do mark session state with a circular tally + uppercase tracked label (ON AIR, KEY, WHISPER).",
+      "Do keep Start / Continue cream-on-tally in every hover and theme state."
+    ],
+    "donts": [
+      "Don't build a neon glass AI-copilot: no frosted panels, aurora fills, indigo/violet meshes, or glow under cards.",
+      "Don't introduce a display serif, geometric “AI” sans, or a second UI family.",
+      "Don't fill large regions with tally red, or use a second accent as brand.",
+      "Don't drop-shadow plates or rest buttons on ambient shadows.",
+      "Don't paint a white or light hover on a cream-labeled go button.",
+      "Don't treat the live overlay like a dashboard; it is a prompter strip."
+    ]
+  }
+}

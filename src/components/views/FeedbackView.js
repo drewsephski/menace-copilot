@@ -7,9 +7,21 @@ export class FeedbackView extends LitElement {
     static styles = [
         unifiedPageStyles,
         css`
+            .unified-wrap {
+                height: 100%;
+            }
+
+            .unified-wrap .surface {
+                flex: 1;
+                min-height: 0;
+                display: flex;
+                flex-direction: column;
+            }
+
             .feedback-embed {
                 width: 100%;
-                height: min(78vh, 900px);
+                flex: 1;
+                min-height: 280px;
                 border: 1px solid var(--border);
                 border-radius: var(--radius-md);
                 background: var(--bg-elevated);
@@ -20,7 +32,7 @@ export class FeedbackView extends LitElement {
                 width: 100%;
                 height: 100%;
                 border: 0;
-                background: #fff;
+                background: var(--bg-elevated);
             }
         `,
     ];
@@ -33,11 +45,7 @@ export class FeedbackView extends LitElement {
 
                     <section class="surface">
                         <div class="feedback-embed">
-                            <iframe
-                                class="feedback-iframe"
-                                src=${FEEDBACK_FORM_URL}
-                                title="Feedback Form"
-                            ></iframe>
+                            <iframe class="feedback-iframe" src=${FEEDBACK_FORM_URL} title="Feedback Form"></iframe>
                         </div>
                     </section>
                 </div>

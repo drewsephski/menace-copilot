@@ -1,0 +1,9 @@
+{
+    "server": "production",
+    "organizationId": "your-production-org-uuid",
+    "checkout": {
+        "monthly": "https://api.polar.sh/v1/checkout-links/polar_cl_…/redirect",
+        "search_pass": "https://api.polar.sh/v1/checkout-links/polar_cl_…/redirect",
+        "byok_monthly": "https://api.polar.sh/v1/checkout-links/polar_cl_…/redirect"
+    }
+}

@@ -1,0 +1,212 @@
+{
+  "title": "Choose the Menace Agent visual world",
+  "question": "The roll assigned On-Air Cart Wall. Keep it, take an alternate, or re-roll.",
+  "options": [
+    {
+      "id": "assigned",
+      "label": "On-Air Cart Wall",
+      "kicker": "THE ROLL",
+      "lineage": "radio talk-break cart wall and ON AIR tally",
+      "thesis": "Setup is a board of labeled carts you punch in; the live session is an ON AIR strip that feeds the next break.",
+      "palette": ["#1a1814", "#2a2620", "#f4efe6", "#c41e3a", "#e8e0d0"],
+      "materials": ["silkscreened metal", "felt-lined cart slots", "plexi ON AIR tally", "labeled carts"],
+      "viewport": "Normal Mac window as a radio board: carts for KEY, WHISPER, and PERMISSIONS with link rails for ready versus gap, dark ON AIR tally, START as the punch-in cart at the bottom.",
+      "risk": "Radio host energy can feel more DJ than interview candidate if the live strip forgets it is a teleprompter.",
+      "raised": [
+        {
+          "from": "challenger-jackfield",
+          "raise": "Every cart shows a structural link state — unbroken, gapped, or doubled — so missing permission is a broken rail, not a toast."
+        },
+        {
+          "from": "challenger-quote",
+          "raise": "Wayfinding is reading: every zone carries its literal name, never radio jargon the candidate must decode."
+        },
+        {
+          "from": "challenger-drum",
+          "raise": "A single tally mark always names NOW — listening versus your turn — the way a chase light owns the beat."
+        },
+        {
+          "from": "challenger-pixorama",
+          "raise": "One hard grid, crisp plates, no soft glass mush that reads as AI-overlay default."
+        },
+        {
+          "from": "challenger-elbow",
+          "raise": "The cart frame is the layout grid; state swaps instantly with no decorative ease."
+        },
+        {
+          "from": "challenger-quarry",
+          "raise": "Setup banks sit as sectional mass with deep gaps between carts, not a flat settings list."
+        }
+      ],
+      "wireframe": {
+        "cols": 12,
+        "rows": 10,
+        "regions": [
+          { "label": "ON AIR tally + Menace Agent", "x": 0, "y": 0, "w": 12, "h": 1, "accent": true },
+          { "label": "KEY cart · OpenRouter", "x": 1, "y": 2, "w": 10, "h": 1 },
+          { "label": "WHISPER cart · local model", "x": 1, "y": 4, "w": 10, "h": 1 },
+          { "label": "PERMISSIONS cart · screen + audio", "x": 1, "y": 6, "w": 10, "h": 1 },
+          { "label": "START punch-in", "x": 3, "y": 8, "w": 6, "h": 1, "accent": true }
+        ]
+      },
+      "comp": ".impeccable/mocks/decision/assigned.webp"
+    },
+    {
+      "id": "model-pick",
+      "label": "Talent Autocue",
+      "kicker": "IMPECCABLE’S PICK",
+      "lineage": "newsroom autocue / teleprompter hood",
+      "thesis": "The candidate is talent; the overlay is the prompter — high-contrast ready-to-speak lines, chrome dimmed to the edge.",
+      "palette": ["#0b0b0b", "#f7f7f2", "#c41e3a", "#3a3a3a"],
+      "materials": ["prompter hood", "matte black bezel", "scrolling white type", "red tally LED"],
+      "viewport": "Black hooded setup screen with one large white instruction, KEY and WHISPER as small edge plates, CONTINUE as a tally that lights red.",
+      "risk": "Also the direction most interview-overlay runs land on — familiar and effective, not a failure of nerve.",
+      "wireframe": {
+        "cols": 12,
+        "rows": 10,
+        "regions": [
+          { "label": "hood bezel", "x": 0, "y": 0, "w": 12, "h": 1 },
+          { "label": "ready-to-speak line", "x": 1, "y": 2, "w": 10, "h": 4, "accent": true },
+          { "label": "KEY · WHISPER edge plates", "x": 1, "y": 7, "w": 10, "h": 1 },
+          { "label": "tally CONTINUE", "x": 4, "y": 8, "w": 4, "h": 1, "accent": true }
+        ]
+      },
+      "comp": ".impeccable/mocks/decision/model-pick.webp"
+    },
+    {
+      "id": "challenger-jackfield",
+      "label": "Normalled Jackfield",
+      "verdict": "competitive",
+      "lineage": "machine-room jackfield normalling schedule",
+      "thesis": "First-run is a resumable schedule: numbered lanes tied to defaults by amber link lines you can break and leave broken.",
+      "palette": ["#0a0a0a", "#ffb000", "#7a5200", "#3a2600"],
+      "materials": ["black glass", "etched amber", "silkscreen fine line", "link rails"],
+      "viewport": "Black glass setup with lanes 01 KEY, 02 WHISPER, 03 PERMISSIONS; unbroken amber means ready, a clean gap means grant access, RESUME CONFIGURATION is the primary.",
+      "case": "Beats the cart wall on product clarity for a gated first-run; loses on audience identification — plant operator, not interview candidate.",
+      "risk": "Reads as industrial SCADA if the playful Menace voice never lands in the copy.",
+      "board": ".impeccable/mocks/decision/challenger-jackfield-board.webp",
+      "hero": ".impeccable/mocks/decision/challenger-jackfield-hero.webp",
+      "wireframe": {
+        "cols": 12,
+        "rows": 10,
+        "regions": [
+          { "label": "legend strip", "x": 0, "y": 0, "w": 2, "h": 10, "accent": true },
+          { "label": "01 KEY · link rail", "x": 2, "y": 2, "w": 9, "h": 1 },
+          { "label": "02 WHISPER · link rail", "x": 2, "y": 4, "w": 9, "h": 1 },
+          { "label": "03 PERMISSIONS · gap", "x": 2, "y": 6, "w": 9, "h": 1 },
+          { "label": "RESUME CONFIGURATION", "x": 3, "y": 8, "w": 7, "h": 1, "accent": true }
+        ]
+      },
+      "comp": ".impeccable/mocks/decision/challenger-jackfield.webp"
+    },
+    {
+      "id": "challenger-quote",
+      "label": "Industrial Quote Grammar",
+      "verdict": "competitive",
+      "lineage": "industrial streetwear with quoted labels and zip-tie tags",
+      "thesis": "Every zone is named in straight quotes; the active cart keeps its orange tag; missing pieces take the hazard stripe.",
+      "palette": ["#ffffff", "#0a0a0a", "#ff5a00", "#e6e6e6"],
+      "materials": ["cotton white", "nylon black", "hazard diagonals", "orange zip-tie tags"],
+      "viewport": "White stockroom setup: \"KEY\", \"WHISPER\", \"PERMISSIONS\" as quoted plates, orange tag on the step in progress, START as a hazard-edged punch.",
+      "case": "Holds product clarity through literal naming; loses audience identification — warehouse streetwear, not a live interview desk.",
+      "risk": "Fashion-tech energy can drown the teleprompter job if the quotes become costume.",
+      "board": ".impeccable/mocks/decision/challenger-quote-board.webp",
+      "hero": ".impeccable/mocks/decision/challenger-quote-hero.webp",
+      "wireframe": {
+        "cols": 12,
+        "rows": 10,
+        "regions": [
+          { "label": "\"MENACE AGENT\"", "x": 0, "y": 0, "w": 12, "h": 1, "accent": true },
+          { "label": "\"KEY\" plate + tag", "x": 1, "y": 2, "w": 10, "h": 1 },
+          { "label": "\"WHISPER\" plate", "x": 1, "y": 4, "w": 10, "h": 1 },
+          { "label": "\"PERMISSIONS\" + stripe", "x": 1, "y": 6, "w": 10, "h": 1 },
+          { "label": "\"START\"", "x": 3, "y": 8, "w": 6, "h": 1, "accent": true }
+        ]
+      },
+      "comp": ".impeccable/mocks/decision/challenger-quote.webp"
+    },
+    {
+      "id": "challenger-quarry",
+      "label": "Cloud Quarry",
+      "verdict": "declined",
+      "lineage": "surreal cloud quarry of cut weather blocks",
+      "thesis": "Setup as cutting and stacking weather blocks into a temporary session that rains answers.",
+      "palette": ["#f5f7fa", "#6b8cae", "#2c3340", "#c5d4e0"],
+      "materials": ["cumulus block", "cut blue void", "silver saw line", "fog arch"],
+      "viewport": "Pale quarry of KEY and WHISPER blocks with a blue void where permissions are missing.",
+      "case": "Loses both axes: candidates do not identify with weather quarries, and the metaphor hides the gated setup.",
+      "kept": "Sectional mass with deep gaps between banks.",
+      "risk": "Surreal atmosphere steals the task.",
+      "hero": ".impeccable/mocks/decision/challenger-quarry-hero.webp"
+    },
+    {
+      "id": "challenger-drum",
+      "label": "Rhythm Step Row",
+      "verdict": "declined",
+      "lineage": "early-80s drum machine step row",
+      "thesis": "Sixteen candy step keys and a chase light turn first-run into a pattern you arm.",
+      "palette": ["#2a2a2a", "#e23b3b", "#f0a030", "#f5e6a0", "#ffffff"],
+      "materials": ["charcoal panel", "lit LEDs", "silkscreen caps", "segmented tempo"],
+      "viewport": "A sixteen-step row with the first three steps as KEY, WHISPER, PERMISSIONS and a chase light for live pulse.",
+      "case": "Loses both axes: musician gear, and sixteen steps pad a three-gate setup.",
+      "kept": "A single mark that always names NOW.",
+      "risk": "Toy instrument energy on a high-stakes interview tool.",
+      "hero": ".impeccable/mocks/decision/challenger-drum-hero.webp"
+    },
+    {
+      "id": "challenger-pixorama",
+      "label": "Pixorama Metropolis",
+      "verdict": "declined",
+      "lineage": "eBoy isometric pixorama city",
+      "thesis": "Hard-pixel city blocks you zoom into for KEY, WHISPER, and the live overlay district.",
+      "palette": ["#ff0033", "#00ccff", "#ffcc00", "#111111"],
+      "materials": ["hard pixels", "isometric blocks", "zero anti-alias", "dither"],
+      "viewport": "Isometric city with Menace Agent HQ; zoom into the interview booth block to start.",
+      "case": "Loses both axes: discovery-city play obscures a gated first-run.",
+      "kept": "One hard grid with no soft mush.",
+      "risk": "Game-map curiosity fights interview urgency.",
+      "hero": ".impeccable/mocks/decision/challenger-pixorama-hero.webp"
+    },
+    {
+      "id": "challenger-elbow",
+      "label": "Elbow Panel Console",
+      "verdict": "declined",
+      "lineage": "pill-cornered starship wall panel",
+      "thesis": "Pastel elbow frames on pure black turn setup banks into color segments you punch.",
+      "palette": ["#000000", "#c4b0e0", "#f2c4a8", "#e6c35c", "#9bb0e8"],
+      "materials": ["flat pastel blocks", "black glass", "numeric code clusters", "elbow frames"],
+      "viewport": "Black wall of lilac and peach pills labeled for KEY, WHISPER, PERMISSIONS, gold active segment.",
+      "case": "Loses both axes: sci-fi console costume, and numeric codes hurt clarity.",
+      "kept": "Frame-as-grid with instant state swaps.",
+      "risk": "Spaceship AI is the category rut wearing pastel.",
+      "hero": ".impeccable/mocks/decision/challenger-elbow-hero.webp"
+    }
+  ],
+  "reroll": {
+    "registers": ["safer", "bolder"]
+  },
+  "buildPath": {
+    "value": "code",
+    "toggle": true
+  },
+  "canon": true,
+  "canonCard": {
+    "label": "The category standard",
+    "thesis": "Dark glass AI overlay with one neon accent, executed at full craft as the familiar interview-copilot product.",
+    "palette": ["#0a0a0a", "#111111", "#3b82f6", "#f5f5f5"],
+    "materials": ["frosted glass", "soft blur", "neon edge", "system sans"],
+    "viewport": "Compact dark overlay beside the call, API key field, Start Session, subtle glow.",
+    "risk": "Indistinguishable from every other AI meeting assistant by design.",
+    "wireframe": {
+      "cols": 12,
+      "rows": 10,
+      "regions": [
+        { "label": "glass chrome", "x": 0, "y": 0, "w": 12, "h": 1 },
+        { "label": "API key", "x": 2, "y": 3, "w": 8, "h": 1 },
+        { "label": "Start Session", "x": 3, "y": 6, "w": 6, "h": 1, "accent": true }
+      ]
+    },
+    "comp": ".impeccable/mocks/decision/canon.webp"
+  },
+  "steer": true
+}
