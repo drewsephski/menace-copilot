@@ -9,9 +9,12 @@ import { AICustomizeView } from '../views/AICustomizeView.js';
 import { FeedbackView } from '../views/FeedbackView.js';
 import { UnlockView } from '../views/UnlockView.js';
 import { DEFAULT_SESSION_PROFILE_ID, getProfileShortLabel, normalizeProfileId } from '../../config/sessionProfiles.js';
+import { clickableControlStyles } from '../views/sharedPageStyles.js';
 
 export class CheatingDaddyApp extends LitElement {
-    static styles = css`
+    static styles = [
+        clickableControlStyles,
+        css`
         * {
             box-sizing: border-box;
             font-family: var(--font);
@@ -368,6 +371,23 @@ export class CheatingDaddyApp extends LitElement {
             flex-direction: column;
         }
 
+        .content-inner.modal-locked {
+            overflow: hidden;
+        }
+
+        .view-slot {
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .view-slot > * {
+            flex: 1;
+            min-height: 0;
+            width: 100%;
+        }
+
         /* Onboarding fills everything */
         .fullscreen {
             position: fixed;
@@ -393,7 +413,8 @@ export class CheatingDaddyApp extends LitElement {
         ::-webkit-scrollbar-thumb:hover {
             background: #444444;
         }
-    `;
+    `,
+    ];
 
     static properties = {
         currentView: { type: String },
@@ -417,6 +438,8 @@ export class CheatingDaddyApp extends LitElement {
         _whisperDownloading: { state: true },
         _localAiDownloadProgress: { state: true },
         _license: { state: true },
+        _personalContextModalOpen: { state: true },
+        _sessionInitializing: { state: true },
     };
 
     constructor() {
@@ -445,6 +468,12 @@ export class CheatingDaddyApp extends LitElement {
         this._localAiDownloadProgress = { active: false, label: '', percentage: null };
         this._license = { valid: false, status: 'missing' };
         this._localVersion = '';
+        this._personalContextModalOpen = false;
+        this._sessionInitializing = false;
+        this._handlePersonalContextModal = event => {
+            this._personalContextModalOpen = Boolean(event.detail?.open);
+            this.requestUpdate();
+        };
 
         this._loadFromStorage();
         this._checkForUpdates();
@@ -462,7 +491,7 @@ export class CheatingDaddyApp extends LitElement {
                 return;
             }
 
-            this._localVersion = result.data.localVersion || await cheatingDaddy.getVersion();
+            this._localVersion = result.data.localVersion || (await cheatingDaddy.getVersion());
             this._updateAvailable = Boolean(result.data.updateAvailable && result.data.releasePageUrl);
             this.requestUpdate();
         } catch (e) {
@@ -504,6 +533,7 @@ export class CheatingDaddyApp extends LitElement {
 
     connectedCallback() {
         super.connectedCallback();
+        window.addEventListener('personal-context-modal-changed', this._handlePersonalContextModal);
 
         if (window.menace) {
             const { on } = window.menace.events;
@@ -516,15 +546,22 @@ export class CheatingDaddyApp extends LitElement {
             on('reconnect-failed', data => this.addNewResponse(data.message));
             on('whisper-downloading', downloading => {
                 this._whisperDownloading = downloading;
+                this.requestUpdate();
             });
             on('local-ai-download-progress', progress => {
                 this._localAiDownloadProgress = progress;
+                this.requestUpdate();
+            });
+            on('session-initializing', initializing => {
+                this._sessionInitializing = Boolean(initializing);
+                this.requestUpdate();
             });
         }
     }
 
     disconnectedCallback() {
         super.disconnectedCallback();
+        window.removeEventListener('personal-context-modal-changed', this._handlePersonalContextModal);
         this._stopTimer();
         if (window.menace) {
             const { removeAllListeners } = window.menace.events;
@@ -535,6 +572,7 @@ export class CheatingDaddyApp extends LitElement {
             removeAllListeners('reconnect-failed');
             removeAllListeners('whisper-downloading');
             removeAllListeners('local-ai-download-progress');
+            removeAllListeners('session-initializing');
         }
     }
 
@@ -596,11 +634,17 @@ export class CheatingDaddyApp extends LitElement {
     // ── Navigation ──
 
     async navigate(view) {
-        if (view === 'license') {
-            this._license = await cheatingDaddy.license.getStatus();
-        }
         this.currentView = view;
         this.requestUpdate();
+
+        if (view === 'license') {
+            try {
+                this._license = await cheatingDaddy.license.getStatus();
+                this.requestUpdate();
+            } catch (error) {
+                console.error('Error refreshing license status:', error);
+            }
+        }
     }
 
     async handleUnlock() {
@@ -645,6 +689,28 @@ export class CheatingDaddyApp extends LitElement {
 
     // ── Session start ──
 
+    _getMainView() {
+        return this.shadowRoot?.querySelector('main-view') ?? null;
+    }
+
+    _reportStartError(message) {
+        const mainView = this._getMainView();
+        if (mainView?.showStartError) {
+            mainView.showStartError(message);
+            return;
+        }
+        if (mainView?.triggerApiKeyError) {
+            mainView.triggerApiKeyError(message);
+        }
+    }
+
+    _openRouterAccessError(access, license) {
+        if (license.includedAi) {
+            return 'Included AI is not ready yet. Check your connection and try again.';
+        }
+        return 'Add your API keys under Advanced before starting.';
+    }
+
     async handleStart() {
         const license = await cheatingDaddy.license.getStatus();
         this._license = license;
@@ -654,48 +720,40 @@ export class CheatingDaddyApp extends LitElement {
             return;
         }
 
-        const mainView = this.shadowRoot.querySelector('main-view');
+        const mainView = this._getMainView();
         if (mainView && typeof mainView._profileContext === 'string') {
             await cheatingDaddy.storage.setProfileContext(this.selectedProfile, mainView._profileContext);
         }
 
         const prefs = await cheatingDaddy.storage.getPreferences();
-        const providerMode = prefs.providerMode === 'cloud' ? 'byok' : prefs.providerMode || 'byok';
+        let providerMode = prefs.providerMode === 'cloud' ? 'byok' : prefs.providerMode || 'whisper_openrouter';
+
+        if (license.includedAi && providerMode === 'byok') {
+            providerMode = 'whisper_openrouter';
+        }
 
         if (providerMode === 'cloud') {
             const creds = await cheatingDaddy.storage.getCredentials();
             if (!creds.hasCloudToken) {
-                const mainView = this.shadowRoot.querySelector('main-view');
-                if (mainView && mainView.triggerApiKeyError) {
-                    mainView.triggerApiKeyError();
-                }
+                this._reportStartError('Add your cloud token under Advanced to continue.');
                 return;
             }
 
             const success = await cheatingDaddy.initializeCloud(this.selectedProfile);
             if (!success) {
-                const mainView = this.shadowRoot.querySelector('main-view');
-                if (mainView && mainView.triggerApiKeyError) {
-                    mainView.triggerApiKeyError();
-                }
+                this._reportStartError('Could not start the cloud session. Check your token and try again.');
                 return;
             }
         } else if (providerMode === 'local') {
             const success = await cheatingDaddy.initializeLocal(this.selectedProfile);
             if (!success) {
-                const mainView = this.shadowRoot.querySelector('main-view');
-                if (mainView && mainView.triggerApiKeyError) {
-                    mainView.triggerApiKeyError();
-                }
+                this._reportStartError('Could not start offline mode. Check the status message and try again.');
                 return;
             }
         } else if (providerMode === 'whisper_openrouter') {
             const access = await cheatingDaddy.openrouter.getAccess();
             if (!access.available) {
-                const mainView = this.shadowRoot.querySelector('main-view');
-                if (mainView && mainView.triggerApiKeyError) {
-                    mainView.triggerApiKeyError();
-                }
+                this._reportStartError(this._openRouterAccessError(access, license));
                 if (!license.valid) {
                     this.currentView = 'license';
                     this.requestUpdate();
@@ -705,24 +763,24 @@ export class CheatingDaddyApp extends LitElement {
 
             const success = await cheatingDaddy.initializeWhisperOpenRouter(this.selectedProfile);
             if (!success) {
-                const mainView = this.shadowRoot.querySelector('main-view');
-                if (mainView && mainView.triggerApiKeyError) {
-                    mainView.triggerApiKeyError();
-                }
+                this._reportStartError('Could not start the session. If this is your first run, wait for downloads to finish or check Advanced.');
                 return;
             }
-        } else {
+        } else if (license.requiresApiKeys) {
             const keyStatus = await cheatingDaddy.storage.getKeyStatus();
             if (!keyStatus.hasGeminiKey) {
-                const mainView = this.shadowRoot.querySelector('main-view');
-                if (mainView && mainView.triggerApiKeyError) {
-                    mainView.triggerApiKeyError();
-                }
+                this._reportStartError('Add your Gemini API key under Advanced to continue.');
                 return;
             }
 
-            await cheatingDaddy.initializeGemini(this.selectedProfile, this.selectedLanguage);
+            const success = await cheatingDaddy.initializeGemini(this.selectedProfile, this.selectedLanguage);
+            if (!success) {
+                this._reportStartError('Could not start with your API keys. Check Advanced and try again.');
+                return;
+            }
         }
+
+        mainView?.clearStartError?.();
 
         cheatingDaddy.startCapture(this.selectedScreenshotInterval, this.selectedImageQuality);
         this.responses = [];
@@ -739,7 +797,7 @@ export class CheatingDaddyApp extends LitElement {
 
     async handleAPIKeyHelp() {
         if (window.menace) {
-            await window.menace.app.openExternal( 'https://openrouter.ai/keys');
+            await window.menace.app.openExternal('https://openrouter.ai/keys');
         }
     }
 
@@ -774,7 +832,7 @@ export class CheatingDaddyApp extends LitElement {
 
     async handleExternalLinkClick(url) {
         if (window.menace) {
-            await window.menace.app.openExternal( url);
+            await window.menace.app.openExternal(url);
         }
     }
 
@@ -817,7 +875,7 @@ export class CheatingDaddyApp extends LitElement {
         super.updated(changedProperties);
 
         if (changedProperties.has('currentView') && window.menace) {
-            window.menace.window.onViewChanged( this.currentView);
+            window.menace.window.onViewChanged(this.currentView);
         }
     }
 
@@ -845,10 +903,16 @@ export class CheatingDaddyApp extends LitElement {
                     <main-view
                         .selectedProfile=${this.selectedProfile}
                         .onProfileChange=${p => this.handleProfileChange(p)}
-                        .onStart=${() => this.handleStart()}
+                        .onStart=${() => {
+                            void this.handleStart().catch(error => {
+                                console.error('Error starting session:', error);
+                                this._reportStartError('Something went wrong while starting. Try again.');
+                            });
+                        }}
                         .onUnlock=${() => this.handleUnlock()}
                         .licenseValid=${Boolean(this._license?.valid)}
-                        .hostedAi=${Boolean(this._license?.hostedAi)}
+                        .requiresApiKeys=${Boolean(this._license?.requiresApiKeys)}
+                        .isInitializing=${this._sessionInitializing}
                         .onExternalLink=${url => this.handleExternalLinkClick(url)}
                         .whisperDownloading=${this._whisperDownloading}
                         .downloadProgress=${this._localAiDownloadProgress}
@@ -867,16 +931,8 @@ export class CheatingDaddyApp extends LitElement {
             case 'customize':
                 return html`
                     <customize-view
-                        .selectedProfile=${this.selectedProfile}
                         .selectedLanguage=${this.selectedLanguage}
-                        .selectedScreenshotInterval=${this.selectedScreenshotInterval}
-                        .selectedImageQuality=${this.selectedImageQuality}
-                        .layoutMode=${this.layoutMode}
-                        .onProfileChange=${p => this.handleProfileChange(p)}
                         .onLanguageChange=${l => this.handleLanguageChange(l)}
-                        .onScreenshotIntervalChange=${i => this.handleScreenshotIntervalChange(i)}
-                        .onImageQualityChange=${q => this.handleImageQualityChange(q)}
-                        .onLayoutModeChange=${lm => this.handleLayoutModeChange(lm)}
                     ></customize-view>
                 `;
 
@@ -1071,6 +1127,10 @@ export class CheatingDaddyApp extends LitElement {
     }
 
     render() {
+        if (!this._storageLoaded) {
+            return html`<div class="app-shell"></div>`;
+        }
+
         // Onboarding is fullscreen, no sidebar
         if (this.currentView === 'onboarding') {
             return html` <div class="fullscreen">${this.renderCurrentView()}</div> `;
@@ -1091,7 +1151,9 @@ export class CheatingDaddyApp extends LitElement {
                 ${this.renderSidebar()}
                 <div class="content">
                     ${isLive ? this.renderLiveBar() : ''}
-                    <div class="content-inner ${isLive ? 'live' : ''}">${this.renderCurrentView()}</div>
+                    <div class="content-inner ${isLive ? 'live' : ''} ${this._personalContextModalOpen ? 'modal-locked' : ''}">
+                        <div class="view-slot">${this.renderCurrentView()}</div>
+                    </div>
                 </div>
             </div>
         `;

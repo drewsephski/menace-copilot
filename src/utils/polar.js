@@ -3,7 +3,7 @@
 const os = require('os');
 const { app } = require('electron');
 const storage = require('../storage');
-const { POLAR_CONFIG, getPolarApiOrigin, isAllowedPolarUrl } = require('./polarConfig');
+const { POLAR_CONFIG, getPolarApiOrigin, isAllowedPolarUrl, resolveCheckoutRedirectUrl } = require('./polarConfig');
 const { syncLicensedHostedAccess, getOpenRouterAccess, isHostedOpenRouterConfigured } = require('./openrouterCredentials');
 const { resolveHostedAiEntitlement } = require('../config/hostedAiEntitlement');
 const { loadBenefitCatalog } = require('./polarBenefits');
@@ -24,6 +24,19 @@ function shouldSkipLicense() {
     } catch {
         return true;
     }
+}
+
+function licenseKeyInputError(raw) {
+    if (typeof raw !== 'string') {
+        return null;
+    }
+
+    const trimmed = raw.trim();
+    if (trimmed.startsWith('polar_pat_') || trimmed.startsWith('polar_oat_')) {
+        return 'That looks like a Polar developer token. Paste your MENACE_… license key from Polar → Purchases instead.';
+    }
+
+    return null;
 }
 
 function sanitizeLicenseKey(raw) {
@@ -84,9 +97,12 @@ function applyEntitlement(status, license) {
         valid: Boolean(status.valid),
     });
 
+    const active = Boolean(status.valid || status.skipped);
+
     return {
         ...status,
         includedAi: entitlement.includedAi,
+        requiresApiKeys: active && !entitlement.includedAi,
         planSku: entitlement.planSku,
         benefitId: entitlement.benefitId,
         entitlementReason: entitlement.reason,
@@ -111,12 +127,28 @@ function publicStatus(extra = {}) {
     return withHostedAiStatus(entitled);
 }
 
+const POLAR_REQUEST_TIMEOUT_MS = 15000;
+
 async function polarRequest(pathname, body) {
-    const response = await fetch(`${getPolarApiOrigin()}${pathname}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-    });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), POLAR_REQUEST_TIMEOUT_MS);
+
+    let response;
+    try {
+        response = await fetch(`${getPolarApiOrigin()}${pathname}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+            signal: controller.signal,
+        });
+    } catch (error) {
+        if (error && error.name === 'AbortError') {
+            return { ok: false, status: 408, payload: { detail: 'Polar is taking too long to respond. Check your connection and try again.' } };
+        }
+        throw error;
+    } finally {
+        clearTimeout(timer);
+    }
 
     let payload = null;
     try {
@@ -348,9 +380,14 @@ async function activateLicense(rawKey) {
         return { success: true, status: await validateStoredLicense() };
     }
 
+    const inputError = licenseKeyInputError(rawKey);
+    if (inputError) {
+        return { success: false, error: inputError };
+    }
+
     const key = sanitizeLicenseKey(rawKey);
     if (!key) {
-        return { success: false, error: 'Enter a valid license key.' };
+        return { success: false, error: 'Enter a valid MENACE_… license key from Polar → Purchases.' };
     }
 
     storage.setLicense({ key, activationId: '', validatedAt: 0 });
@@ -392,8 +429,16 @@ function getCheckoutUrl(rawSku) {
         };
     }
 
-    const url = POLAR_CONFIG.checkout[sku];
-    if (!url || url.includes('REPLACE_') || !isAllowedPolarUrl(url)) {
+    const configuredUrl = POLAR_CONFIG.checkout[sku];
+    if (!configuredUrl || configuredUrl.includes('REPLACE_')) {
+        return {
+            success: false,
+            error: 'Checkout is not configured for this plan. Run npm run polar:sync.',
+        };
+    }
+
+    const url = resolveCheckoutRedirectUrl(configuredUrl);
+    if (!url || !isAllowedPolarUrl(url)) {
         return {
             success: false,
             error: 'Checkout is not configured for this plan. Run npm run polar:sync.',

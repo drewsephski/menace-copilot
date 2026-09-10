@@ -1,9 +1,12 @@
 import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
-import { unifiedPageStyles } from './sharedPageStyles.js';
-import { getPickerProfiles, getSessionProfile } from '../../config/sessionProfiles.js';
+import { clickableControlStyles, unifiedPageStyles } from './sharedPageStyles.js';
+import { getPickerProfiles, getSessionProfile, normalizeProfileId } from '../../config/sessionProfiles.js';
+import '../ui/uiSelect.js';
+import './PersonalContextPanel.js';
 
 export class AICustomizeView extends LitElement {
     static styles = [
+        clickableControlStyles,
         unifiedPageStyles,
         css`
             .unified-page {
@@ -60,7 +63,16 @@ export class AICustomizeView extends LitElement {
     }
 
     async _loadFromStorage() {
-        await this._loadContextForProfile(this.selectedProfile);
+        try {
+            const prefs = await cheatingDaddy.storage.getPreferences();
+            const storedProfile = normalizeProfileId(prefs.selectedProfile);
+            if (storedProfile !== this.selectedProfile) {
+                this.onProfileChange(storedProfile);
+            }
+            await this._loadContextForProfile(storedProfile);
+        } catch (error) {
+            console.error('Error loading session context:', error);
+        }
     }
 
     updated(changedProperties) {
@@ -71,8 +83,9 @@ export class AICustomizeView extends LitElement {
     }
 
     async _handleProfileChange(e) {
+        const nextProfile = e.detail?.value ?? e.target.value;
         await cheatingDaddy.storage.setProfileContext(this.selectedProfile, this._context);
-        this.onProfileChange(e.target.value);
+        this.onProfileChange(nextProfile);
     }
 
     async _saveContext(val) {
@@ -92,13 +105,17 @@ export class AICustomizeView extends LitElement {
                         <div class="page-subtitle">Background and instructions for each conversation type.</div>
                     </div>
 
+                    <personal-context-panel></personal-context-panel>
+
                     <section class="surface">
                         <div class="form-grid">
                             <div class="form-group">
                                 <label class="form-label">Session type</label>
-                                <select class="control" .value=${this.selectedProfile} @change=${this._handleProfileChange}>
-                                    ${profiles.map(p => html`<option value=${p.id}>${p.label}</option>`)}
-                                </select>
+                                <ui-select
+                                    .value=${this.selectedProfile}
+                                    .options=${profiles.map(p => ({ value: p.id, label: p.label }))}
+                                    @change=${this._handleProfileChange}
+                                ></ui-select>
                             </div>
                             <div class="form-group vertical">
                                 <label class="form-label">${profile.contextLabel}</label>

@@ -22,6 +22,12 @@ const INVOKE_CHANNELS = new Set([
     'storage:delete-all-sessions',
     'storage:get-today-limits',
     'storage:clear-all',
+    'personal-context:get-metadata',
+    'personal-context:get',
+    'personal-context:set',
+    'personal-context:clear',
+    'personal-context:parse-import',
+    'personal-context:get-import-prompt',
     'credentials:get-key-status',
     'credentials:set-api-key',
     'credentials:set-openrouter-api-key',
@@ -57,7 +63,7 @@ const INVOKE_CHANNELS = new Set([
     'update-google-search-setting',
 ]);
 
-const SEND_CHANNELS = new Set(['update-keybinds', 'view-changed', 'log-message']);
+const SEND_CHANNELS = new Set(['update-keybinds', 'view-changed', 'personal-context-modal-changed', 'log-message']);
 
 const ON_CHANNELS = new Set([
     'new-response',
@@ -155,6 +161,15 @@ const menace = {
         setProfileContext: (profileId, context) => invoke('storage:set-profile-context', profileId, context),
     },
 
+    personalContext: {
+        getMetadata: () => invoke('personal-context:get-metadata'),
+        get: () => invoke('personal-context:get'),
+        set: (context, options) => invoke('personal-context:set', context, options),
+        clear: () => invoke('personal-context:clear'),
+        parseImport: (text, options) => invoke('personal-context:parse-import', text, options),
+        getImportPrompt: () => invoke('personal-context:get-import-prompt'),
+    },
+
     credentials: {
         getKeyStatus: () => invoke('credentials:get-key-status'),
         setApiKey: apiKey => invoke('credentials:set-api-key', apiKey),
@@ -188,6 +203,7 @@ const menace = {
         refreshDisplayMediaHandler: () => invoke('refresh-display-media-handler'),
         onViewChanged: view => send('view-changed', view),
         onKeybindsChanged: keybinds => send('update-keybinds', keybinds),
+        setPersonalContextModalOpen: open => send('personal-context-modal-changed', open),
     },
 
     events: {

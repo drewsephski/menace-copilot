@@ -163,11 +163,11 @@ describe('scenario prompts', () => {
 });
 
 describe('buildSystemPrompt structure', () => {
-    test('layers context after profile behavior and before final reminder', () => {
+    test('layers session context after profile behavior and before final reminder', () => {
         const prompt = buildSystemPrompt('sales', 'Battlecard: ACME Corp uses us for onboarding.', false);
         const universalIdx = prompt.indexOf('## Universal rules');
         const salesIdx = prompt.indexOf('## Sales call behavior');
-        const contextIdx = prompt.indexOf('## User-provided context');
+        const contextIdx = prompt.indexOf('## Session/profile context');
         const reminderIdx = prompt.indexOf('## Final reminder');
 
         assert.ok(universalIdx < salesIdx);
@@ -176,8 +176,8 @@ describe('buildSystemPrompt structure', () => {
         assert.match(prompt, /Battlecard: ACME Corp/);
     });
 
-    test('empty context uses explicit placeholder', () => {
+    test('empty session context uses explicit placeholder', () => {
         const prompt = buildSystemPrompt('meeting', '   ', false);
-        assert.match(prompt, /\(No additional context provided\.\)/);
+        assert.match(prompt, /\(No additional session context provided\.\)/);
     });
 });

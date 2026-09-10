@@ -5,7 +5,7 @@ if (require('electron-squirrel-startup')) {
 require('./utils/loadEnv').loadEnv();
 
 const { app, BrowserWindow, shell, ipcMain } = require('electron');
-const { createWindow, updateGlobalShortcuts } = require('./utils/window');
+const { createWindow, updateGlobalShortcuts, applyWindowLayer } = require('./utils/window');
 const { checkForUpdates, getReleasePageUrl } = require('./utils/updateChecker');
 const { setupGeminiIpcHandlers, stopMacOSAudioCapture, sendToRenderer } = require('./utils/gemini');
 const storage = require('./storage');
@@ -15,6 +15,12 @@ const { getOpenRouterAccess, getUserOpenRouterApiKey, syncLicensedHostedAccess }
 
 const geminiSessionRef = { current: null };
 let mainWindow = null;
+
+function openExternalWithoutBlocking(url) {
+    void shell.openExternal(url).catch(error => {
+        console.error('Error opening external URL:', error);
+    });
+}
 
 function createMainWindow() {
     mainWindow = createWindow(sendToRenderer, geminiSessionRef);
@@ -51,6 +57,7 @@ app.whenReady().then(async () => {
     createMainWindow();
     setupGeminiIpcHandlers(geminiSessionRef);
     setupStorageIpcHandlers();
+    setupPersonalContextIpcHandlers();
     setupOpenRouterIpcHandlers();
     setupPolarIpcHandlers();
     setupGeneralIpcHandlers();
@@ -222,6 +229,9 @@ function setupStorageIpcHandlers() {
     ipcMain.handle('storage:update-preference', async (event, key, value) => {
         try {
             storage.updatePreference(key, value);
+            if (key === 'windowLayer' && mainWindow && !mainWindow.isDestroyed()) {
+                applyWindowLayer(mainWindow);
+            }
             return { success: true };
         } catch (error) {
             console.error('Error updating preference:', error);
@@ -339,6 +349,79 @@ function setupStorageIpcHandlers() {
     });
 }
 
+function setupPersonalContextIpcHandlers() {
+    const personalContextStorage = require('./utils/personalContextStorage');
+
+    ipcMain.handle('personal-context:get-metadata', async () => {
+        try {
+            return { success: true, data: personalContextStorage.getPersonalContextMetadata() };
+        } catch (error) {
+            console.error('Error getting personal context metadata:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('personal-context:get', async () => {
+        try {
+            const context = personalContextStorage.getPersonalContext();
+            return { success: true, data: context };
+        } catch (error) {
+            console.error('Error getting personal context:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('personal-context:set', async (event, context, options = {}) => {
+        try {
+            const result = personalContextStorage.setPersonalContext(context, options);
+            if (!result.ok) {
+                return { success: false, errors: result.errors, warnings: result.warnings || [] };
+            }
+            return { success: true, data: result.metadata, warnings: result.warnings || [] };
+        } catch (error) {
+            console.error('Error setting personal context:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('personal-context:clear', async () => {
+        try {
+            personalContextStorage.clearPersonalContext();
+            return { success: true };
+        } catch (error) {
+            console.error('Error clearing personal context:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('personal-context:parse-import', async (event, text, options = {}) => {
+        try {
+            const result = personalContextStorage.parsePersonalContextImport(text, options);
+            if (!result.ok) {
+                return { success: false, errors: result.errors, warnings: result.warnings || [] };
+            }
+            return {
+                success: true,
+                data: result.data,
+                metadata: result.metadata,
+                warnings: result.warnings || [],
+            };
+        } catch (error) {
+            console.error('Error parsing personal context import:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('personal-context:get-import-prompt', async () => {
+        try {
+            return { success: true, data: personalContextStorage.buildChatGPTPersonalContextExportPrompt() };
+        } catch (error) {
+            console.error('Error building import prompt:', error);
+            return { success: false, error: error.message };
+        }
+    });
+}
+
 function setupOpenRouterIpcHandlers() {
     ipcMain.handle('openrouter:get-access', async () => {
         try {
@@ -383,7 +466,7 @@ function setupPolarIpcHandlers() {
 
     ipcMain.handle('polar:open-portal', async () => {
         try {
-            await shell.openExternal(polar.getCustomerPortalUrl());
+            openExternalWithoutBlocking(polar.getCustomerPortalUrl());
             return { success: true };
         } catch (error) {
             console.error('Error opening Polar customer portal:', error);
@@ -402,7 +485,7 @@ function setupPolarIpcHandlers() {
                 return result;
             }
 
-            await shell.openExternal(result.url);
+            openExternalWithoutBlocking(result.url);
             return { success: true };
         } catch (error) {
             console.error('Error opening Polar checkout:', error);
@@ -433,7 +516,7 @@ function setupGeneralIpcHandlers() {
                 return { success: false, error: 'No release page configured' };
             }
 
-            await shell.openExternal(releaseUrl);
+            openExternalWithoutBlocking(releaseUrl);
             return { success: true };
         } catch (error) {
             console.error('Error opening update page:', error);
@@ -473,9 +556,7 @@ function setupGeneralIpcHandlers() {
                 const helperPath = app.isPackaged
                     ? path.join(process.resourcesPath, '..', 'Helpers', 'SystemAudioDump')
                     : path.join(__dirname, 'assets', 'SystemAudioDump');
-                audio = fs.existsSync(helperPath)
-                    ? { state: 'configured', label: 'Configured' }
-                    : { state: 'unavailable', label: 'Helper missing' };
+                audio = fs.existsSync(helperPath) ? { state: 'configured', label: 'Configured' } : { state: 'unavailable', label: 'Helper missing' };
             } else {
                 audio = { state: 'configured', label: 'Configured' };
             }
@@ -489,13 +570,17 @@ function setupGeneralIpcHandlers() {
             }
 
             let ai = { state: 'needs-license', label: 'Needs pass' };
-            if (license.valid && license.includedAi && license.hostedAi) {
-                ai = { state: 'ready', label: 'Included AI' };
-            } else if (license.valid && license.includedAi && access.source === 'hosted-unconfigured') {
-                ai = { state: 'unavailable', label: 'Gateway not deployed' };
+            if (license.valid && license.includedAi) {
+                if (license.hostedAi) {
+                    ai = { state: 'ready', label: 'Included AI' };
+                } else if (access.source === 'hosted-unconfigured') {
+                    ai = { state: 'unavailable', label: 'Gateway not deployed' };
+                } else {
+                    ai = { state: 'ready', label: 'Included AI' };
+                }
             } else if (license.valid && access.available) {
                 ai = { state: 'configured', label: 'Configured' };
-            } else if (license.valid) {
+            } else if (license.valid && license.requiresApiKeys) {
                 ai = { state: 'needs-keys', label: 'Needs keys' };
             }
 
@@ -523,7 +608,7 @@ function setupGeneralIpcHandlers() {
                 return { success: false, error: 'Invalid URL' };
             }
 
-            await shell.openExternal(url);
+            openExternalWithoutBlocking(url);
             return { success: true };
         } catch (error) {
             console.error('Error opening external URL:', error);

@@ -5,6 +5,9 @@ const path = require('path');
 
 const CONFIG_FILENAME = 'menace-runtime-config.json';
 
+/** Production Menace gateway (Vercel serverless). Override via env or menace-runtime-config.json. */
+const DEFAULT_HOSTED_API_BASE_URL = 'https://menace-agent.vercel.app/api';
+
 let cachedConfig = null;
 
 function trimOrNull(value) {
@@ -55,7 +58,10 @@ function getPublicRuntimeConfig() {
         releasePageUrl: trimOrNull(process.env.MENACE_RELEASE_PAGE_URL) ?? trimOrNull(file.releasePageUrl),
         localAiBinariesBaseUrl:
             trimOrNull(process.env.MENACE_LOCAL_AI_BINARIES_BASE_URL) ?? trimOrNull(file.localAiBinariesBaseUrl),
-        hostedApiBaseUrl: trimOrNull(process.env.MENACE_HOSTED_API_BASE_URL) ?? trimOrNull(file.hostedApiBaseUrl),
+        hostedApiBaseUrl:
+            trimOrNull(process.env.MENACE_HOSTED_API_BASE_URL) ??
+            trimOrNull(file.hostedApiBaseUrl) ??
+            DEFAULT_HOSTED_API_BASE_URL,
     };
 
     return cachedConfig;
@@ -71,6 +77,7 @@ function isHostedGatewayConfigured() {
 
 module.exports = {
     CONFIG_FILENAME,
+    DEFAULT_HOSTED_API_BASE_URL,
     getPublicRuntimeConfig,
     resetPublicRuntimeConfigCache,
     isHostedGatewayConfigured,

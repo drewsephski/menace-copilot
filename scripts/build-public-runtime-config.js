@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { DEFAULT_HOSTED_API_BASE_URL } = require('../src/config/publicRuntimeConfig');
 
 const SECRET_PATTERNS = [
     /(?:OPENROUTER_API_KEY|MENACE_OPENROUTER_API_KEY|GEMINI_API_KEY|POLAR_ACCESS_TOKEN)\s*=\s*['"]?[A-Za-z0-9._-]{8,}/i,
@@ -19,7 +20,7 @@ function buildPublicRuntimeConfigFromEnv() {
         updateManifestUrl: process.env.MENACE_UPDATE_MANIFEST_URL?.trim() || null,
         releasePageUrl: process.env.MENACE_RELEASE_PAGE_URL?.trim() || null,
         localAiBinariesBaseUrl: process.env.MENACE_LOCAL_AI_BINARIES_BASE_URL?.trim() || null,
-        hostedApiBaseUrl: process.env.MENACE_HOSTED_API_BASE_URL?.trim() || null,
+        hostedApiBaseUrl: process.env.MENACE_HOSTED_API_BASE_URL?.trim() || DEFAULT_HOSTED_API_BASE_URL,
     };
 }
 

@@ -1,5 +1,38 @@
 import { css } from '../../assets/lit-core-2.7.4.min.js';
 
+/** Ensures nested labels/icons don't steal clicks from buttons and div[role=button] controls. */
+export const clickableControlStyles = css`
+    button,
+    ui-button,
+    ui-select,
+    input[type='button'],
+    input[type='submit'],
+    input[type='reset'],
+    [role='button'],
+    a[href],
+    .link,
+    span.link,
+    summary {
+        cursor: pointer;
+        -webkit-app-region: no-drag;
+    }
+
+    button *:not(input):not(textarea):not(select):not(option),
+    [role='button'] *:not(input):not(textarea):not(select),
+    .start-button *,
+    .btn-primary *,
+    summary *:not(input):not(textarea):not(select) {
+        pointer-events: none;
+        cursor: inherit;
+    }
+
+    button:disabled,
+    [role='button'][aria-disabled='true'],
+    .start-button.disabled {
+        pointer-events: none;
+    }
+`;
+
 export const unifiedPageStyles = css`
     * {
         box-sizing: border-box;
@@ -85,6 +118,16 @@ export const unifiedPageStyles = css`
         justify-content: space-between;
         gap: var(--space-md);
         min-width: 0;
+    }
+
+    ui-select {
+        --ui-select-width: 200px;
+        flex-shrink: 0;
+    }
+
+    .form-group.vertical ui-select {
+        width: 100%;
+        --ui-select-width: 100%;
     }
 
     .form-group.vertical {
@@ -182,6 +225,10 @@ export const unifiedPageStyles = css`
         }
 
         .control {
+            width: 100%;
+        }
+
+        ui-select {
             width: 100%;
         }
     }

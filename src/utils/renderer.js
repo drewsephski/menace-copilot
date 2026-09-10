@@ -30,6 +30,12 @@ const ipcRenderer = {
             'storage:delete-all-sessions': () => menace.storage.deleteAllSessions(),
             'storage:get-today-limits': () => menace.storage.getTodayLimits(),
             'storage:clear-all': () => menace.storage.clearAll(),
+            'personal-context:get-metadata': () => menace.personalContext.getMetadata(),
+            'personal-context:get': () => menace.personalContext.get(),
+            'personal-context:set': () => menace.personalContext.set(args[0], args[1]),
+            'personal-context:clear': () => menace.personalContext.clear(),
+            'personal-context:parse-import': () => menace.personalContext.parseImport(args[0], args[1]),
+            'personal-context:get-import-prompt': () => menace.personalContext.getImportPrompt(),
             'credentials:get-key-status': () => menace.credentials.getKeyStatus(),
             'credentials:set-api-key': () => menace.credentials.setApiKey(args[0]),
             'credentials:set-openrouter-api-key': () => menace.credentials.setOpenRouterApiKey(args[0]),
@@ -69,6 +75,9 @@ const ipcRenderer = {
         }
         if (channel === 'update-keybinds') {
             return menace.window.onKeybindsChanged(args[0]);
+        }
+        if (channel === 'personal-context-modal-changed') {
+            return menace.window.setPersonalContextModalOpen(args[0]);
         }
         throw new Error(`Unsupported IPC send channel: ${channel}`);
     },
@@ -148,6 +157,27 @@ const storage = {
     },
     async setProfileContext(profileId, context) {
         return ipcRenderer.invoke('storage:set-profile-context', profileId, context);
+    },
+    async getPersonalContextMetadata() {
+        const result = await ipcRenderer.invoke('personal-context:get-metadata');
+        return result.success ? result.data : { exists: false, factCount: 0, categories: [] };
+    },
+    async getPersonalContext() {
+        const result = await ipcRenderer.invoke('personal-context:get');
+        return result.success ? result.data : null;
+    },
+    async setPersonalContext(context, options) {
+        return ipcRenderer.invoke('personal-context:set', context, options);
+    },
+    async clearPersonalContext() {
+        return ipcRenderer.invoke('personal-context:clear');
+    },
+    async parsePersonalContextImport(text, options) {
+        return ipcRenderer.invoke('personal-context:parse-import', text, options);
+    },
+    async getPersonalContextImportPrompt() {
+        const result = await ipcRenderer.invoke('personal-context:get-import-prompt');
+        return result.success ? result.data : '';
     },
 
     // Keybinds
@@ -260,6 +290,7 @@ async function initializeGemini(profile = 'sales', language = 'en-US') {
     } else {
         cheatingDaddy.setStatus('error');
     }
+    return Boolean(success);
 }
 
 async function initializeLocal(profile = 'sales') {
@@ -908,10 +939,6 @@ function handleShortcut(shortcutKey) {
     }
 }
 
-getElectronBridge().on('handle-shortcut', shortcutKey => {
-    handleShortcut(shortcutKey);
-});
-
 // Create reference to the main app element
 const cheatingDaddyApp = document.querySelector('cheating-daddy-app');
 
@@ -1256,6 +1283,10 @@ const cheatingDaddy = {
 
 // Make it globally available
 window.cheatingDaddy = cheatingDaddy;
+
+ipcRenderer.on('handle-shortcut', (event, shortcutKey) => {
+    handleShortcut(shortcutKey);
+});
 
 // Load theme after DOM is ready
 if (document.readyState === 'loading') {

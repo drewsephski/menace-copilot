@@ -1,8 +1,10 @@
 import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
-import { getSessionProfile } from '../../config/sessionProfiles.js';
+import { clickableControlStyles } from './sharedPageStyles.js';
 
 export class AssistantView extends LitElement {
-    static styles = css`
+    static styles = [
+        clickableControlStyles,
+        css`
         :host {
             height: 100%;
             display: flex;
@@ -42,6 +44,31 @@ export class AssistantView extends LitElement {
 
         .response-container [data-word] {
             display: inline-block;
+        }
+
+        .listening-empty {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: var(--space-sm);
+            padding-top: var(--space-md);
+        }
+
+        .listening-empty__title {
+            margin: 0;
+            font-size: var(--font-size-2xl);
+            font-weight: var(--font-weight-semibold);
+            line-height: 1.2;
+            letter-spacing: -0.02em;
+            color: var(--text-primary);
+        }
+
+        .listening-empty__hint {
+            margin: 0;
+            font-size: var(--font-size-sm);
+            font-weight: var(--font-weight-normal);
+            line-height: 1.4;
+            color: var(--text-muted);
         }
 
         /* ── Markdown ── */
@@ -318,7 +345,8 @@ export class AssistantView extends LitElement {
             height: calc(100% + 2px);
             pointer-events: none;
         }
-    `;
+    `,
+    ];
 
     static properties = {
         responses: { type: Array },
@@ -599,7 +627,7 @@ export class AssistantView extends LitElement {
 
     updated(changedProperties) {
         super.updated(changedProperties);
-        if (changedProperties.has('responses') || changedProperties.has('currentResponseIndex') || changedProperties.has('selectedProfile')) {
+        if (changedProperties.has('responses') || changedProperties.has('currentResponseIndex')) {
             this.updateResponseContent();
         }
 
@@ -627,11 +655,10 @@ export class AssistantView extends LitElement {
         const currentResponse = this.getCurrentResponse();
         if (!currentResponse) {
             const emptyRoot = document.createElement('div');
-            // Lit's render isn't used here; set simple HTML for the empty state.
+            emptyRoot.className = 'listening-empty';
             emptyRoot.innerHTML = `
-                <p><strong>Listening…</strong></p>
-                <p>${getSessionProfile(this.selectedProfile).listeningText}</p>
-                <p>Menace will surface a response when there's something worth answering.</p>
+                <p class="listening-empty__title">Listening…</p>
+                <p class="listening-empty__hint">Your answer will appear here</p>
             `;
             container.innerHTML = '';
             container.appendChild(emptyRoot);

@@ -1,11 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const {
-    encryptCredentialFields,
-    decryptCredentialFields,
-    migrateCredentialsFile,
-} = require('./utils/secureCredentials');
+const { encryptCredentialFields, decryptCredentialFields, migrateCredentialsFile } = require('./utils/secureCredentials');
 
 const CONFIG_VERSION = 1;
 
@@ -58,6 +54,8 @@ const DEFAULT_PREFERENCES = {
     googleSearchEnabled: false,
     localLlmModel: 'unsloth/Qwen3.5-4B-GGUF:Q4_K_M',
     whisperModel: 'base.en',
+    theme: 'dark',
+    windowLayer: 'overlay',
 };
 
 const DEFAULT_KEYBINDS = null; // null means use system defaults
@@ -68,6 +66,10 @@ const DEFAULT_LIMITS = {
 
 // Get the config directory path based on OS
 function getConfigDir() {
+    if (process.env.NODE_ENV === 'test' && process.env.MENACE_TEST_CONFIG_DIR) {
+        return process.env.MENACE_TEST_CONFIG_DIR;
+    }
+
     const platform = os.platform();
     let base;
 
@@ -400,6 +402,7 @@ function getPreferences() {
 
     preferences.whisperModel = legacyWhisperModels[preferences.whisperModel] || preferences.whisperModel;
     preferences.fontSize = normalizeFontSize(preferences.fontSize);
+    preferences.windowLayer = preferences.windowLayer === 'normal' ? 'normal' : 'overlay';
     preferences.selectedProfile = normalizeStoredProfileId(preferences.selectedProfile);
     preferences.profileContexts = {
         ...DEFAULT_PROFILE_CONTEXTS,
@@ -725,6 +728,11 @@ function deleteAllSessions() {
 // ============ CLEAR ALL DATA ============
 
 function clearAllData() {
+    try {
+        require('./utils/personalContextStorage').clearPersonalContext();
+    } catch (error) {
+        console.warn('Could not clear personal context during reset:', error.message);
+    }
     resetConfigDir();
     return true;
 }

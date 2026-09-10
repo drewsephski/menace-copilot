@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
-const { getSystemPrompt } = require('./prompts');
+const { buildSessionSystemPrompt } = require('./prompts');
+const personalContextStorage = require('./personalContextStorage');
 const { sendToRenderer, initializeNewSession, saveConversationTurn, sendToOpenRouter } = require('./gemini');
 const {
     ensureNativeBinary,
@@ -538,7 +539,12 @@ async function initializeLocalSession(model, whisperModel, profile, customPrompt
         answerBackend = 'llama';
         initializationController = new AbortController();
         llamaCacheSnapshot = getDirectoryEntries(path.join(getModelsDirectory(), 'llama'));
-        currentSystemPrompt = getSystemPrompt(profile, customPrompt, false);
+        currentSystemPrompt = buildSessionSystemPrompt(
+            profile,
+            customPrompt,
+            false,
+            personalContextStorage.getPersonalContext()
+        );
         llamaModel = model;
 
         const nativeFiles = await prepareNativeFiles(model, whisperModel, initializationController.signal);
@@ -589,7 +595,12 @@ async function initializeWhisperOpenRouterSession(whisperModel, profile, customP
         closeLocalSession();
         answerBackend = 'openrouter';
         initializationController = new AbortController();
-        currentSystemPrompt = getSystemPrompt(profile, customPrompt, false);
+        currentSystemPrompt = buildSessionSystemPrompt(
+            profile,
+            customPrompt,
+            false,
+            personalContextStorage.getPersonalContext()
+        );
 
         const whisperFiles = await prepareWhisperFiles(whisperModel, initializationController.signal);
         if (!whisperFiles.whisperBinaryPath || !fs.existsSync(whisperFiles.whisperBinaryPath)) {

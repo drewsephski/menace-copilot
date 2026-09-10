@@ -2,9 +2,12 @@ import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
 import '../ui/premiumPlanPicker.js';
 import '../ui/premiumLicenseInput.js';
 import { DEFAULT_SESSION_PROFILE_ID, getPickerProfiles, getSessionProfile } from '../../config/sessionProfiles.js';
+import { clickableControlStyles } from './sharedPageStyles.js';
 
 export class OnboardingView extends LitElement {
-    static styles = css`
+    static styles = [
+        clickableControlStyles,
+        css`
         * {
             font-family: var(--font);
             cursor: default;
@@ -438,7 +441,8 @@ export class OnboardingView extends LitElement {
                 transition: none;
             }
         }
-    `;
+    `,
+    ];
 
     static properties = {
         currentSlide: { type: Number },

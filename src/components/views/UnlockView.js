@@ -1,10 +1,12 @@
 import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
-import { unifiedPageStyles } from './sharedPageStyles.js';
+import { clickableControlStyles, unifiedPageStyles } from './sharedPageStyles.js';
 import '../ui/premiumPlanPicker.js';
 import '../ui/premiumLicenseInput.js';
+import '../ui/uiConfirmDialog.js';
 
 export class UnlockView extends LitElement {
     static styles = [
+        clickableControlStyles,
         unifiedPageStyles,
         css`
             .status-row {
@@ -81,6 +83,8 @@ export class UnlockView extends LitElement {
         _activationError: { type: String, state: true },
         _checkoutError: { type: String, state: true },
         _selectedSku: { type: String, state: true },
+        _removeConfirmOpen: { type: Boolean, state: true },
+        _removingLicense: { type: Boolean, state: true },
     };
 
     constructor() {
@@ -92,6 +96,8 @@ export class UnlockView extends LitElement {
         this._activationError = '';
         this._checkoutError = '';
         this._selectedSku = 'search_pass';
+        this._removeConfirmOpen = false;
+        this._removingLicense = false;
     }
 
     get _statusLabel() {
@@ -102,49 +108,124 @@ export class UnlockView extends LitElement {
         return 'Locked';
     }
 
+    _licenseBridge() {
+        return window.menace?.license || window.cheatingDaddy?.license || null;
+    }
+
     async _openCheckout(sku) {
         this._checkoutError = '';
         this._checkoutBusy = true;
-        const result = await cheatingDaddy.license.openCheckout(sku || this._selectedSku);
-        this._checkoutBusy = false;
-        if (!result.success) {
-            this._checkoutError = result.error || 'Could not open checkout.';
-        }
         this.requestUpdate();
+
+        try {
+            const bridge = this._licenseBridge();
+            if (!bridge) {
+                this._checkoutError = 'App bridge is not ready. Restart Menace Agent and try again.';
+                return;
+            }
+
+            const result = await bridge.openCheckout(sku || this._selectedSku);
+            if (!result?.success) {
+                this._checkoutError = result?.error || 'Could not open checkout.';
+            }
+        } catch (error) {
+            this._checkoutError = error?.message || 'Could not open checkout.';
+        } finally {
+            this._checkoutBusy = false;
+            this.requestUpdate();
+        }
     }
 
     async _openPortal() {
         this._checkoutError = '';
         this._activationError = '';
-        const result = await cheatingDaddy.license.openPortal();
-        if (!result.success) {
-            this._checkoutError = result.error || 'Could not open Polar portal.';
+
+        try {
+            const bridge = this._licenseBridge();
+            if (!bridge) {
+                this._checkoutError = 'App bridge is not ready. Restart Menace Agent and try again.';
+                return;
+            }
+
+            const result = await bridge.openPortal();
+            if (!result?.success) {
+                this._checkoutError = result.error || 'Could not open Polar portal.';
+            }
+        } catch (error) {
+            this._checkoutError = error?.message || 'Could not open Polar portal.';
         }
+
+        this.requestUpdate();
     }
 
     async _handleActivate() {
         if (this._busy) return;
         this._busy = true;
         this._activationError = '';
-        const result = await cheatingDaddy.license.activate(this._key);
-        this._busy = false;
+        this.requestUpdate();
 
-        if (!result.success) {
-            this._activationError = result.error || 'Could not activate that key.';
+        try {
+            const bridge = this._licenseBridge();
+            if (!bridge) {
+                this._activationError = 'App bridge is not ready. Restart Menace Agent and try again.';
+                return;
+            }
+
+            const result = await bridge.activate(this._key);
+            if (!result?.success) {
+                this._activationError = result.error || 'Could not activate that key.';
+                return;
+            }
+
+            this._key = '';
+            this.license = result.status;
+            this.dispatchEvent(new CustomEvent('license-changed', { detail: result.status, bubbles: true, composed: true }));
+        } catch (error) {
+            this._activationError = error?.message || 'Could not activate that key.';
+        } finally {
+            this._busy = false;
             this.requestUpdate();
+        }
+    }
+
+    _openRemoveConfirm() {
+        if (this._removingLicense) {
             return;
         }
-
-        this._key = '';
-        this.license = result.status;
-        this.dispatchEvent(new CustomEvent('license-changed', { detail: result.status, bubbles: true, composed: true }));
+        this._removeConfirmOpen = true;
         this.requestUpdate();
     }
 
-    async _handleClear() {
-        const status = await cheatingDaddy.license.clear();
-        this.license = status;
-        this.dispatchEvent(new CustomEvent('license-changed', { detail: status, bubbles: true, composed: true }));
+    _closeRemoveConfirm() {
+        if (this._removingLicense) {
+            return;
+        }
+        this._removeConfirmOpen = false;
+        this.requestUpdate();
+    }
+
+    async _confirmRemoveLicense() {
+        if (this._removingLicense) {
+            return;
+        }
+
+        const bridge = this._licenseBridge();
+        if (!bridge) {
+            return;
+        }
+
+        this._removingLicense = true;
+        this.requestUpdate();
+
+        try {
+            const status = await bridge.clear();
+            this._removeConfirmOpen = false;
+            this.license = status;
+            this.dispatchEvent(new CustomEvent('license-changed', { detail: status, bubbles: true, composed: true }));
+        } finally {
+            this._removingLicense = false;
+            this.requestUpdate();
+        }
     }
 
     _handleKeyChange(event) {
@@ -202,7 +283,7 @@ export class UnlockView extends LitElement {
                                   <section class="surface">
                                       <div class="surface-title">This Mac</div>
                                       <div class="surface-subtitle">Keys are limited to two devices. Removing the key here does not refund.</div>
-                                      <button class="ghost-button" @click=${() => this._handleClear()}>Remove license from this Mac</button>
+                                      <button class="ghost-button" @click=${this._openRemoveConfirm}>Remove license from this Mac</button>
                                   </section>
                               `
                             : html`
@@ -248,6 +329,19 @@ export class UnlockView extends LitElement {
                                   </section>
                               `
                     }
+
+                    <ui-confirm-dialog
+                        ?open=${this._removeConfirmOpen}
+                        title="Remove license from this Mac?"
+                        description="This device will lose access until you activate a key again. Removing the key here does not refund your purchase."
+                        confirm-label="Remove license"
+                        cancel-label="Cancel"
+                        tone="remove"
+                        ?loading=${this._removingLicense}
+                        loading-label="Removing…"
+                        @confirm=${this._confirmRemoveLicense}
+                        @cancel=${this._closeRemoveConfirm}
+                    ></ui-confirm-dialog>
                 </div>
             </div>
         `;

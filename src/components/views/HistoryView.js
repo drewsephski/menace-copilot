@@ -1,9 +1,10 @@
 import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
 import { getProfileLabelIncludingLegacy } from '../../config/sessionProfiles.js';
-import { unifiedPageStyles } from './sharedPageStyles.js';
+import { clickableControlStyles, unifiedPageStyles } from './sharedPageStyles.js';
 
 export class HistoryView extends LitElement {
     static styles = [
+        clickableControlStyles,
         unifiedPageStyles,
         css`
             .unified-page {

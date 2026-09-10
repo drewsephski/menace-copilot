@@ -1,9 +1,85 @@
-const { BrowserWindow, globalShortcut, ipcMain, screen, shell } = require('electron');
+const { BrowserWindow, globalShortcut, ipcMain, Menu, screen, shell } = require('electron');
 const { isAllowedExternalUrl } = require('./externalUrl');
 const path = require('node:path');
 const storage = require('../storage');
 
 let mouseEventsIgnored = false;
+let currentAppView = 'main';
+let personalContextModalOpen = false;
+
+function getWindowLayerPreference() {
+    try {
+        const prefs = storage.getPreferences();
+        return prefs.windowLayer === 'normal' ? 'normal' : 'overlay';
+    } catch (error) {
+        console.warn('Unable to read window layer preference:', error.message);
+        return 'overlay';
+    }
+}
+
+function applyWindowLayer(mainWindow) {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+        return;
+    }
+
+    const layer = getWindowLayerPreference();
+    if (layer === 'overlay') {
+        mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+        if (process.platform === 'win32') {
+            mainWindow.setAlwaysOnTop(true, 'screen-saver', 1);
+            return;
+        }
+
+        mainWindow.setAlwaysOnTop(true, 'screen-saver');
+        return;
+    }
+
+    mainWindow.setAlwaysOnTop(false);
+    if (process.platform === 'darwin') {
+        try {
+            mainWindow.setVisibleOnAllWorkspaces(false);
+        } catch (error) {
+            console.warn('Could not disable visible on all workspaces:', error.message);
+        }
+    }
+}
+
+function applyOverlayWindowState(mainWindow, sendToRenderer) {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+        return;
+    }
+
+    const isLiveMode = currentAppView === 'assistant';
+    applyWindowLayer(mainWindow);
+
+    if (isLiveMode) {
+        const [currentX, currentY] = mainWindow.getPosition();
+        mainWindow.setMinimumSize(MIN_LIVE_WINDOW_SIZE.width, MIN_LIVE_WINDOW_SIZE.height);
+        mainWindow.setSize(LIVE_WINDOW_SIZE.width, LIVE_WINDOW_SIZE.height, true);
+        const display = screen.getDisplayMatching(mainWindow.getBounds());
+        const work = display.workArea;
+        const nextX = Math.min(currentX, work.x + work.width - LIVE_WINDOW_SIZE.width - 24);
+        const nextY = Math.max(work.y + 24, Math.min(currentY, work.y + work.height - LIVE_WINDOW_SIZE.height - 24));
+        mainWindow.setPosition(Math.max(work.x + 24, nextX), nextY);
+        return;
+    }
+
+    resetClickThrough(mainWindow, sendToRenderer);
+    if (!personalContextModalOpen) {
+        mainWindow.setMinimumSize(MIN_WINDOW_SIZE.width, MIN_WINDOW_SIZE.height);
+        mainWindow.setSize(DEFAULT_MAIN_WINDOW_SIZE.width, DEFAULT_MAIN_WINDOW_SIZE.height, true);
+    }
+}
+
+function resetClickThrough(mainWindow, sendToRenderer) {
+    mouseEventsIgnored = false;
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.setIgnoreMouseEvents(false);
+    }
+    if (typeof sendToRenderer === 'function') {
+        sendToRenderer('click-through-toggled', false);
+    }
+}
 
 const DEFAULT_MAIN_WINDOW_SIZE = { width: 1100, height: 800 };
 const LIVE_WINDOW_SIZE = { width: 520, height: 400 };
@@ -63,7 +139,7 @@ function createWindow(sendToRenderer, geminiSessionRef) {
         frame: false,
         transparent: true,
         hasShadow: false,
-        alwaysOnTop: process.platform === 'win32',
+        alwaysOnTop: true,
         webPreferences: {
             preload: path.join(__dirname, '../preload.js'),
             nodeIntegration: false,
@@ -77,12 +153,10 @@ function createWindow(sendToRenderer, geminiSessionRef) {
     });
 
     configureDisplayMediaHandler();
+    resetClickThrough(mainWindow, sendToRenderer);
 
     mainWindow.setContentProtection(true);
-    if (process.platform === 'win32') {
-        mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-        mainWindow.setAlwaysOnTop(true, 'screen-saver', 1);
-    }
+    applyWindowLayer(mainWindow);
 
     // Hide from Windows taskbar
     if (process.platform === 'win32') {
@@ -123,6 +197,29 @@ function createWindow(sendToRenderer, geminiSessionRef) {
     });
 
     mainWindow.loadFile(path.join(__dirname, '../index.html'));
+
+    mainWindow.webContents.on('context-menu', (event, params) => {
+        const menuTemplate = [];
+
+        if (params.isEditable) {
+            menuTemplate.push(
+                { role: 'cut', enabled: params.editFlags.canCut },
+                { role: 'copy', enabled: params.editFlags.canCopy },
+                { role: 'paste', enabled: params.editFlags.canPaste },
+                { type: 'separator' },
+                { role: 'selectAll', enabled: params.editFlags.canSelectAll }
+            );
+        } else if (params.selectionText) {
+            menuTemplate.push({ role: 'copy' });
+        }
+
+        if (menuTemplate.length === 0) {
+            return;
+        }
+
+        event.preventDefault();
+        Menu.buildFromTemplate(menuTemplate).popup({ window: mainWindow });
+    });
 
     // After window is created, initialize keybinds
     mainWindow.webContents.once('dom-ready', () => {
@@ -228,6 +325,12 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
     if (keybinds.toggleClickThrough) {
         try {
             globalShortcut.register(keybinds.toggleClickThrough, () => {
+                if (currentAppView !== 'assistant') {
+                    resetClickThrough(mainWindow, sendToRenderer);
+                    console.log('Click-through is only available during a live session.');
+                    return;
+                }
+
                 mouseEventsIgnored = !mouseEventsIgnored;
                 if (mouseEventsIgnored) {
                     mainWindow.setIgnoreMouseEvents(true, { forward: true });
@@ -347,30 +450,13 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
 
 function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
     ipcMain.on('view-changed', (event, view) => {
-        if (!mainWindow.isDestroyed()) {
-            const isLiveMode = view === 'assistant';
+        currentAppView = view || 'main';
+        applyOverlayWindowState(mainWindow, sendToRenderer);
+    });
 
-            if (process.platform !== 'win32') {
-                mainWindow.setAlwaysOnTop(isLiveMode);
-                mainWindow.setVisibleOnAllWorkspaces(isLiveMode, { visibleOnFullScreen: isLiveMode });
-            }
-
-            if (isLiveMode) {
-                // Collapse into a compact prompter overlay for the live session.
-                const [currentX, currentY] = mainWindow.getPosition();
-                mainWindow.setMinimumSize(MIN_LIVE_WINDOW_SIZE.width, MIN_LIVE_WINDOW_SIZE.height);
-                mainWindow.setSize(LIVE_WINDOW_SIZE.width, LIVE_WINDOW_SIZE.height, true);
-                const display = screen.getDisplayMatching(mainWindow.getBounds());
-                const work = display.workArea;
-                const nextX = Math.min(currentX, work.x + work.width - LIVE_WINDOW_SIZE.width - 24);
-                const nextY = Math.max(work.y + 24, Math.min(currentY, work.y + work.height - LIVE_WINDOW_SIZE.height - 24));
-                mainWindow.setPosition(Math.max(work.x + 24, nextX), nextY);
-            } else {
-                mainWindow.setIgnoreMouseEvents(false);
-                mainWindow.setMinimumSize(MIN_WINDOW_SIZE.width, MIN_WINDOW_SIZE.height);
-                mainWindow.setSize(DEFAULT_MAIN_WINDOW_SIZE.width, DEFAULT_MAIN_WINDOW_SIZE.height, true);
-            }
-        }
+    ipcMain.on('personal-context-modal-changed', (event, open) => {
+        personalContextModalOpen = Boolean(open);
+        applyOverlayWindowState(mainWindow, sendToRenderer);
     });
 
     ipcMain.handle('window-minimize', () => {
@@ -420,4 +506,6 @@ module.exports = {
     getDefaultKeybinds,
     updateGlobalShortcuts,
     setupWindowIpcHandlers,
+    applyWindowLayer,
+    getWindowLayerPreference,
 };

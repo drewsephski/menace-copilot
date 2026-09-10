@@ -2,7 +2,9 @@ const { GoogleGenAI, Modality } = require('@google/genai');
 const { BrowserWindow, ipcMain } = require('electron');
 const { spawn } = require('child_process');
 const { saveDebugAudio } = require('../audioUtils');
-const { getSystemPrompt } = require('./prompts');
+const { buildSessionSystemPrompt } = require('./prompts');
+const personalContextStorage = require('./personalContextStorage');
+const { renderPersonalContextForProfile } = require('./personalContext/render');
 const {
     getAvailableModel,
     incrementLimitCount,
@@ -45,6 +47,25 @@ let currentProfile = null;
 let currentCustomPrompt = null;
 let isInitializingSession = false;
 let currentSystemPrompt = null;
+
+function resolveSystemPrompt(profile, profileContext, searchAvailable) {
+    const personalContext = personalContextStorage.getPersonalContext();
+    return buildSessionSystemPrompt(profile, profileContext || '', searchAvailable, personalContext);
+}
+
+function buildCloudUserContext(profile, profileContext) {
+    const personalContext = personalContextStorage.getPersonalContext();
+    const personalRendered = renderPersonalContextForProfile(personalContext, profile);
+    const parts = [];
+    if (personalRendered) {
+        parts.push(`Personal context:\n${personalRendered}`);
+    }
+    const sessionText = (profileContext || '').trim();
+    if (sessionText) {
+        parts.push(`Session context:\n${sessionText}`);
+    }
+    return parts.join('\n\n');
+}
 
 function formatSpeakerResults(results) {
     let text = '';
@@ -200,7 +221,8 @@ function hasOpenRouterKey() {
 }
 
 function usesHostedAnswerGateway() {
-    return getOpenRouterAccess().source === 'hosted';
+    const source = getOpenRouterAccess().source;
+    return source === 'hosted' || source === 'hosted-unconfigured';
 }
 
 async function ensureLicensedSession() {
@@ -555,7 +577,7 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'sal
     // OpenRouter generates live answers when configured — it has no Google Search tool.
     const searchInPrompt = googleSearchEnabled && !hasOpenRouterKey();
 
-    const systemPrompt = getSystemPrompt(profile, customPrompt, searchInPrompt);
+    const systemPrompt = resolveSystemPrompt(profile, customPrompt, searchInPrompt);
     currentSystemPrompt = systemPrompt; // Store for OpenRouter
 
     // Initialize new conversation session only on first connect
@@ -1096,7 +1118,9 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
                 saveConversationTurn(transcription, response);
             });
             sendToRenderer('session-initializing', true);
-            await connectCloud(token, profile, userContext);
+            const profileContext = require('../storage').getProfileContext(profile) || userContext || '';
+            const cloudContext = buildCloudUserContext(profile, profileContext);
+            await connectCloud(token, profile, cloudContext);
             sendToRenderer('session-initializing', false);
             return true;
         } catch (err) {
@@ -1154,7 +1178,7 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
         }
 
         currentProviderMode = 'whisper_openrouter';
-        currentSystemPrompt = getSystemPrompt(profile, customPrompt || '', false);
+        currentSystemPrompt = resolveSystemPrompt(profile, customPrompt || '', false);
         const success = await getLocalAi().initializeWhisperOpenRouterSession(whisperModel, profile, customPrompt || '');
         if (!success) {
             currentProviderMode = 'byok';

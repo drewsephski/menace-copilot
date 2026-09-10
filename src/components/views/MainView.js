@@ -1,36 +1,34 @@
 import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
 import { getPickerProfiles, getSessionProfile, normalizeProfileId } from '../../config/sessionProfiles.js';
+import { clickableControlStyles } from './sharedPageStyles.js';
+import '../ui/uiSelect.js';
 
-const FLASH_VISION_MODEL = 'Gemini 3.6 Flash';
-const OPENROUTER_MODEL_LABELS = {
-    'google/gemini-3.5-flash-lite': 'Gemini 3.5 Flash Lite',
-    'google/gemini-3.5-flash': 'Gemini 3.5 Flash',
-    'google/gemini-3.6-flash': 'Gemini 3.6 Flash',
-    'google/gemini-3.1-flash-lite': 'Gemini 3.1 Flash Lite',
-    'google/gemini-2.5-flash-lite': 'Gemini 2.5 Flash Lite',
-    'google/gemini-2.5-flash': 'Gemini 2.5 Flash',
-};
+const WHISPER_MODEL_OPTIONS = [
+    { value: 'tiny.en', label: 'Fastest' },
+    { value: 'base.en', label: 'Balanced (recommended)' },
+    { value: 'small.en', label: 'Most accurate' },
+];
 
-const WHISPER_MODEL_LABELS = {
-    'tiny.en': 'Whisper Tiny',
-    'base.en': 'Whisper Base',
-    'small.en': 'Whisper Small',
-};
+const WHISPER_MODEL_OPTIONS_LOCAL = [
+    { value: 'tiny.en', label: 'Fastest' },
+    { value: 'base.en', label: 'Balanced' },
+    { value: 'small.en', label: 'Most accurate' },
+];
 
-function formatOpenRouterModelLabel(modelSlug) {
-    if (!modelSlug) {
-        return 'Gemini 3.5 Flash Lite';
+function normalizeProviderMode(mode) {
+    if (mode === 'cloud') {
+        return 'byok';
     }
-
-    return OPENROUTER_MODEL_LABELS[modelSlug] || modelSlug.split('/').pop().replace(/-/g, ' ');
-}
-
-function formatWhisperModelLabel(modelId) {
-    return WHISPER_MODEL_LABELS[modelId] || 'Whisper';
+    if (mode === 'byok' || mode === 'local' || mode === 'whisper_openrouter') {
+        return mode;
+    }
+    return 'whisper_openrouter';
 }
 
 export class MainView extends LitElement {
-    static styles = css`
+    static styles = [
+        clickableControlStyles,
+        css`
         * {
             font-family: var(--font);
             cursor: default;
@@ -99,13 +97,19 @@ export class MainView extends LitElement {
             display: flex;
             flex-direction: column;
             gap: var(--space-xs);
+            min-width: 0;
+        }
+
+        ui-select {
+            width: 100%;
+            --ui-select-width: 100%;
         }
 
         .config-section {
             border: 1px solid var(--border);
             border-radius: var(--radius-md);
             background: var(--bg-surface);
-            overflow: hidden;
+            overflow: visible;
         }
 
         .config-summary {
@@ -174,103 +178,6 @@ export class MainView extends LitElement {
             line-height: var(--line-height);
         }
 
-        .flash-panel {
-            display: flex;
-            flex-direction: column;
-            gap: var(--space-sm);
-            padding: 14px;
-            border: 1px solid var(--border);
-            border-radius: var(--radius-md);
-            background: var(--bg-surface);
-        }
-
-        .flash-panel-header {
-            display: flex;
-            align-items: flex-start;
-            justify-content: space-between;
-            gap: var(--space-sm);
-        }
-
-        .flash-panel-title {
-            font-size: var(--font-size-sm);
-            font-weight: var(--font-weight-semibold);
-            color: var(--text-primary);
-        }
-
-        .flash-panel-subtitle {
-            margin-top: 2px;
-            font-size: var(--font-size-xs);
-            color: var(--text-muted);
-            line-height: var(--line-height);
-        }
-
-        .flash-panel-badge {
-            flex: none;
-            padding: 3px 8px;
-            border-radius: var(--radius-sm);
-            border: 1px solid rgba(196, 30, 58, 0.35);
-            background: rgba(196, 30, 58, 0.12);
-            color: #f3b8c3;
-            font-size: 10px;
-            font-weight: var(--font-weight-semibold);
-            letter-spacing: 0.06em;
-            text-transform: uppercase;
-        }
-
-        .flash-model-list {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            margin-top: 2px;
-        }
-
-        .flash-model-row {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) auto;
-            gap: var(--space-sm);
-            align-items: baseline;
-            padding-top: 8px;
-            border-top: 1px solid var(--border);
-        }
-
-        .flash-model-row:first-child {
-            padding-top: 0;
-            border-top: none;
-        }
-
-        .flash-model-copy {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-            min-width: 0;
-        }
-
-        .flash-model-role {
-            font-size: var(--font-size-xs);
-            font-weight: var(--font-weight-medium);
-            color: var(--text-secondary);
-        }
-
-        .flash-model-detail {
-            font-size: 11px;
-            color: var(--text-muted);
-            line-height: var(--line-height);
-        }
-
-        .flash-model-name {
-            font-size: var(--font-size-xs);
-            font-weight: var(--font-weight-semibold);
-            color: var(--text-primary);
-            text-align: right;
-            white-space: nowrap;
-        }
-
-        .flash-panel-footnote {
-            font-size: 11px;
-            color: var(--text-muted);
-            line-height: var(--line-height);
-        }
-
         .included-banner {
             display: flex;
             align-items: flex-start;
@@ -328,46 +235,6 @@ export class MainView extends LitElement {
 
         .context-area {
             min-height: 96px;
-        }
-
-        .readiness-strip {
-            display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 8px;
-        }
-
-        .readiness-cell {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-            padding: 8px 10px;
-            border: 1px solid var(--border);
-            border-radius: var(--radius-sm);
-            background: var(--bg-surface);
-        }
-
-        .readiness-name {
-            font-size: 10px;
-            font-weight: var(--font-weight-semibold);
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            color: var(--text-muted);
-        }
-
-        .readiness-value {
-            font-size: var(--font-size-xs);
-            color: var(--text-secondary);
-        }
-
-        .readiness-value.ready {
-            color: var(--success);
-        }
-
-        .readiness-value.pending,
-        .readiness-value.needs-keys,
-        .readiness-value.needs-license,
-        .readiness-value.denied {
-            color: var(--warning);
         }
 
         .included-banner-icon {
@@ -593,7 +460,15 @@ export class MainView extends LitElement {
             cursor: pointer;
             user-select: none;
             -webkit-user-select: none;
+            -webkit-app-region: no-drag;
             transition: background-color 150ms ease;
+        }
+
+        .start-error {
+            margin-top: var(--space-xs);
+            font-size: var(--font-size-xs);
+            color: var(--danger, #c41e3a);
+            line-height: var(--line-height);
         }
 
         .start-button .btn-label {
@@ -632,6 +507,7 @@ export class MainView extends LitElement {
             color: #f7f7f2;
             opacity: 0.45;
             cursor: not-allowed;
+            pointer-events: none;
         }
 
         .download-progress-fill {
@@ -893,25 +769,6 @@ export class MainView extends LitElement {
             text-decoration: underline;
         }
 
-        .help-models {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-        }
-
-        .help-model {
-            font-size: var(--font-size-xs);
-            color: var(--text-secondary);
-            display: flex;
-            justify-content: space-between;
-        }
-
-        .help-model-name {
-            font-family: var(--font-mono);
-            font-size: 11px;
-            color: var(--text-primary);
-        }
-
         .help-divider {
             border: none;
             border-top: 1px solid var(--border);
@@ -957,7 +814,8 @@ export class MainView extends LitElement {
                 transition: none;
             }
         }
-    `;
+    `,
+    ];
 
     static properties = {
         onStart: { type: Function },
@@ -969,7 +827,7 @@ export class MainView extends LitElement {
         downloadProgress: { type: Object },
         onCancelDownload: { type: Function },
         licenseValid: { type: Boolean },
-        hostedAi: { type: Boolean },
+        requiresApiKeys: { type: Boolean },
         onUnlock: { type: Function },
         // Internal state
         _mode: { state: true },
@@ -980,10 +838,10 @@ export class MainView extends LitElement {
         _tokenError: { state: true },
         _keyError: { state: true },
         _whisperModel: { state: true },
-        _answerModel: { state: true },
         _showLocalHelp: { state: true },
         _profileContext: { state: true },
-        _readiness: { state: true },
+        _startError: { state: true },
+        _advancedOpen: { state: true },
     };
 
     constructor() {
@@ -997,7 +855,7 @@ export class MainView extends LitElement {
         this.downloadProgress = { active: false, label: '', percentage: null };
         this.onCancelDownload = () => {};
         this.licenseValid = false;
-        this.hostedAi = false;
+        this.requiresApiKeys = false;
         this.onUnlock = () => {};
 
         this._mode = 'whisper_openrouter';
@@ -1009,9 +867,10 @@ export class MainView extends LitElement {
         this._keyError = false;
         this._showLocalHelp = false;
         this._whisperModel = 'base.en';
-        this._answerModel = 'google/gemini-3.5-flash-lite';
         this._profileContext = '';
-        this._readiness = null;
+        this._startError = '';
+        this._advancedOpen = false;
+        this._startErrorTimer = null;
 
         this._animId = null;
         this._time = 0;
@@ -1024,15 +883,16 @@ export class MainView extends LitElement {
 
     async _loadFromStorage() {
         try {
-            const [prefs, creds, config] = await Promise.all([
+            const [prefs, creds] = await Promise.all([
                 cheatingDaddy.storage.getPreferences(),
                 cheatingDaddy.storage.getCredentials().catch(() => ({})),
-                cheatingDaddy.storage.getConfig().catch(() => ({})),
             ]);
 
-            this._mode = 'whisper_openrouter';
-            if (prefs.providerMode !== 'whisper_openrouter') {
-                await cheatingDaddy.storage.updatePreference('providerMode', 'whisper_openrouter');
+            this._mode = normalizeProviderMode(prefs.providerMode);
+
+            const storedProfile = normalizeProfileId(prefs.selectedProfile);
+            if (storedProfile !== this.selectedProfile) {
+                this.onProfileChange(storedProfile);
             }
 
             const keyStatus = await cheatingDaddy.storage.getKeyStatus().catch(() => ({
@@ -1045,8 +905,7 @@ export class MainView extends LitElement {
             this._openrouterKey = keyStatus.hasOpenRouterKey ? 'saved' : '';
             this._openaiKey = creds.hasOpenaiKey ? 'saved' : '';
             this._whisperModel = prefs.whisperModel || 'base.en';
-            this._answerModel = config.openrouterModel || 'google/gemini-3.5-flash-lite';
-            this._profileContext = await cheatingDaddy.storage.getProfileContext(this.selectedProfile);
+            this._profileContext = await cheatingDaddy.storage.getProfileContext(storedProfile);
 
             this.requestUpdate();
         } catch (e) {
@@ -1054,31 +913,19 @@ export class MainView extends LitElement {
         }
     }
 
-    async _refreshReadiness() {
-        if (!window.menace) {
-            return;
-        }
-        try {
-            const result = await window.menace.app.getSessionReadiness();
-            if (result?.success) {
-                this._readiness = result.data;
-                this.requestUpdate();
-            }
-        } catch (error) {
-            console.warn('Could not load session readiness:', error);
-        }
-    }
-
     connectedCallback() {
         super.connectedCallback();
         document.addEventListener('keydown', this.boundKeydownHandler);
-        this._refreshReadiness();
     }
 
     disconnectedCallback() {
         super.disconnectedCallback();
         document.removeEventListener('keydown', this.boundKeydownHandler);
         if (this._animId) cancelAnimationFrame(this._animId);
+        if (this._startErrorTimer) {
+            clearTimeout(this._startErrorTimer);
+            this._startErrorTimer = null;
+        }
     }
 
     updated(changedProperties) {
@@ -1095,9 +942,6 @@ export class MainView extends LitElement {
                 this._profileContext = context;
                 this.requestUpdate();
             });
-        }
-        if (changedProperties.has('licenseValid') || changedProperties.has('hostedAi')) {
-            this._refreshReadiness();
         }
     }
 
@@ -1171,9 +1015,17 @@ export class MainView extends LitElement {
             return;
         }
 
-        await cheatingDaddy.storage.setProfileContext(this.selectedProfile, this._profileContext);
+        const previousProfile = this.selectedProfile;
+        const previousContext = this._profileContext;
         this.onProfileChange(nextProfile);
-        this._profileContext = await cheatingDaddy.storage.getProfileContext(nextProfile);
+
+        try {
+            await cheatingDaddy.storage.setProfileContext(previousProfile, previousContext);
+            this._profileContext = await cheatingDaddy.storage.getProfileContext(nextProfile);
+        } catch (error) {
+            console.error('Error switching session profile:', error);
+        }
+
         this.requestUpdate();
     }
 
@@ -1203,7 +1055,43 @@ export class MainView extends LitElement {
         });
     }
 
+    _handleAdvancedToggle(e) {
+        const section = e.target;
+        if (!(section instanceof HTMLDetailsElement)) return;
+        this._advancedOpen = section.open;
+        this._handleConfigToggle(e);
+    }
+
     // ── Start ──
+
+    _openAdvancedSettings() {
+        this._advancedOpen = true;
+    }
+
+    showStartError(message) {
+        if (this._startErrorTimer) {
+            clearTimeout(this._startErrorTimer);
+            this._startErrorTimer = null;
+        }
+
+        this._startError = message;
+        this._openAdvancedSettings();
+        this.requestUpdate();
+
+        this._startErrorTimer = setTimeout(() => {
+            this._startError = '';
+            this._startErrorTimer = null;
+            this.requestUpdate();
+        }, 6000);
+    }
+
+    clearStartError() {
+        if (this._startErrorTimer) {
+            clearTimeout(this._startErrorTimer);
+            this._startErrorTimer = null;
+        }
+        this._startError = '';
+    }
 
     _handleStart() {
         if (!this.licenseValid) {
@@ -1213,17 +1101,27 @@ export class MainView extends LitElement {
 
         if (this.isInitializing || this.downloadProgress.active) return;
 
-        if (this._mode === 'byok') {
-            if (!this._geminiKey.trim()) {
-                this._keyError = true;
-                this.requestUpdate();
-                return;
-            }
-        } else if (this._mode === 'whisper_openrouter') {
-            if (!this.hostedAi) {
-                if (!this._geminiKey.trim() || !this._openrouterKey.trim()) {
+        this.clearStartError();
+
+        if (this.requiresApiKeys) {
+            if (this._mode === 'byok') {
+                if (!this._geminiKey.trim()) {
                     this._keyError = true;
-                    this.requestUpdate();
+                    this.showStartError('Add your Gemini API key under Advanced to continue.');
+                    return;
+                }
+            } else if (this._mode === 'whisper_openrouter') {
+                const missingGemini = !this._geminiKey.trim();
+                const missingOpenRouter = !this._openrouterKey.trim();
+                if (missingGemini || missingOpenRouter) {
+                    this._keyError = true;
+                    if (missingGemini && missingOpenRouter) {
+                        this.showStartError('Add your screen and live-answer API keys under Advanced to continue.');
+                    } else if (missingOpenRouter) {
+                        this.showStartError('Add your live-answer API key under Advanced to continue.');
+                    } else {
+                        this.showStartError('Add your screen API key under Advanced to continue.');
+                    }
                     return;
                 }
             }
@@ -1232,8 +1130,23 @@ export class MainView extends LitElement {
         this.onStart();
     }
 
-    triggerApiKeyError() {
+    triggerApiKeyError(message = '') {
         this._keyError = this._mode !== 'local';
+        if (message) {
+            this.showStartError(message);
+            return;
+        }
+
+        if (this._mode === 'whisper_openrouter' && this.requiresApiKeys) {
+            this.showStartError('Check your API keys under Advanced, then try Start again.');
+            return;
+        }
+
+        if (this._mode === 'whisper_openrouter' && !this.requiresApiKeys) {
+            this.showStartError('AI access is not ready yet. Open Advanced for details or try again shortly.');
+            return;
+        }
+
         this.requestUpdate();
         setTimeout(() => {
             this._tokenError = false;
@@ -1343,6 +1256,7 @@ export class MainView extends LitElement {
                       `
                     : ''
             }
+            ${this._startError ? html`<div class="start-error" role="alert">${this._startError}</div>` : ''}
         `;
     }
 
@@ -1353,51 +1267,6 @@ export class MainView extends LitElement {
                 <span class="divider-text">or</span>
                 <div class="divider-line"></div>
             </div>
-        `;
-    }
-
-    _renderFlashModelsPanel({ badge = 'Auto-selected', footnote }) {
-        const answerModel = formatOpenRouterModelLabel(this._answerModel);
-        const whisperModel = formatWhisperModelLabel(this._whisperModel);
-
-        return html`
-            <section class="flash-panel" aria-label="Latest Flash models used by Menace Agent">
-                <div class="flash-panel-header">
-                    <div>
-                        <div class="flash-panel-title">Latest Flash models</div>
-                        <div class="flash-panel-subtitle">Fast Google Flash models, picked for fast live responses.</div>
-                    </div>
-                    <span class="flash-panel-badge">${badge}</span>
-                </div>
-
-                <div class="flash-model-list">
-                    <div class="flash-model-row">
-                        <div class="flash-model-copy">
-                            <div class="flash-model-role">Live answers</div>
-                            <div class="flash-model-detail">Streams short, conversational replies while you talk.</div>
-                        </div>
-                        <div class="flash-model-name">${answerModel}</div>
-                    </div>
-
-                    <div class="flash-model-row">
-                        <div class="flash-model-copy">
-                            <div class="flash-model-role">Screen context</div>
-                            <div class="flash-model-detail">Reads slides, prompts, and code when you capture the screen.</div>
-                        </div>
-                        <div class="flash-model-name">${FLASH_VISION_MODEL}</div>
-                    </div>
-
-                    <div class="flash-model-row">
-                        <div class="flash-model-copy">
-                            <div class="flash-model-role">Transcription</div>
-                            <div class="flash-model-detail">Runs locally on your Mac for low-latency speech-to-text.</div>
-                        </div>
-                        <div class="flash-model-name">${whisperModel}</div>
-                    </div>
-                </div>
-
-                ${footnote ? html`<div class="flash-panel-footnote">${footnote}</div>` : ''}
-            </section>
         `;
     }
 
@@ -1414,10 +1283,8 @@ export class MainView extends LitElement {
             <div class="included-banner" role="status">
                 <div class="included-banner-icon">${this._renderIncludedCheckIcon()}</div>
                 <div class="included-banner-copy">
-                    <div class="included-banner-title">You're all set — no API keys needed</div>
-                    <div class="included-banner-text">
-                        Your pass includes live AI answers and Gemini screen context. Press Start when you're ready.
-                    </div>
+                    <div class="included-banner-title">You're all set</div>
+                    <div class="included-banner-text">Your pass is active. Add context above, then press Start.</div>
                 </div>
             </div>
         `;
@@ -1426,11 +1293,8 @@ export class MainView extends LitElement {
     _renderLicenseRequiredCard() {
         return html`
             <div class="unlock-card">
-                <div class="unlock-card-title">Pass required to use Menace Agent</div>
-                <div class="unlock-card-text">
-                    A pass is required for every session — even if you bring your own API keys. Gemini Live and screen context
-                    run through the app, so OpenRouter alone is not enough.
-                </div>
+                <div class="unlock-card-title">Pass required</div>
+                <div class="unlock-card-text">Unlock a pass to start your session.</div>
                 <button class="unlock-card-button" type="button" @click=${() => this.onUnlock()}>View passes from $15/mo</button>
             </div>
         `;
@@ -1441,11 +1305,8 @@ export class MainView extends LitElement {
             <div class="included-banner" role="status">
                 <div class="included-banner-icon">${this._renderIncludedCheckIcon()}</div>
                 <div class="included-banner-copy">
-                    <div class="included-banner-title">Pass active — add your API keys</div>
-                    <div class="included-banner-text">
-                        Your BYOK pass unlocks the overlay. Add Gemini and OpenRouter keys below — you pay the model providers
-                        directly.
-                    </div>
+                    <div class="included-banner-title">Pass active</div>
+                    <div class="included-banner-text">Add your API keys below to finish setup.</div>
                 </div>
             </div>
         `;
@@ -1454,17 +1315,16 @@ export class MainView extends LitElement {
     _renderGeminiKeyField() {
         return html`
             <div class="form-group">
-                <label class="form-label">Gemini API Key</label>
+                <label class="form-label">Screen & voice key</label>
                 <input
                     type="password"
-                    placeholder="Required for screen context"
+                    placeholder="Paste your key"
                     class="${this._keyError ? 'error' : ''}"
                     .value=${this._geminiKey}
                     @input=${e => this._saveGeminiKey(e.target.value)}
                 />
                 <div class="form-hint">
-                    <span class="link" @click=${() => this.onExternalLink('https://aistudio.google.com/apikey')}>Get a Gemini key</span>
-                    for screen context and Gemini Live.
+                    <span class="link" @click=${() => this.onExternalLink('https://aistudio.google.com/apikey')}>Get a key</span>
                 </div>
             </div>
         `;
@@ -1473,17 +1333,16 @@ export class MainView extends LitElement {
     _renderOpenRouterKeyField() {
         return html`
             <div class="form-group">
-                <label class="form-label">OpenRouter API Key</label>
+                <label class="form-label">Live answers key</label>
                 <input
                     type="password"
-                    placeholder="sk-or-..."
+                    placeholder="Paste your key"
                     class="${this._keyError ? 'error' : ''}"
                     .value=${this._openrouterKey}
                     @input=${e => this._saveOpenRouterKey(e.target.value)}
                 />
                 <div class="form-hint">
-                    <span class="link" @click=${() => this.onExternalLink('https://openrouter.ai/keys')}>Get an OpenRouter key</span>
-                    for live responses.
+                    <span class="link" @click=${() => this.onExternalLink('https://openrouter.ai/keys')}>Get a key</span>
                 </div>
             </div>
         `;
@@ -1494,15 +1353,11 @@ export class MainView extends LitElement {
             return this._renderLicenseRequiredCard();
         }
 
-        if (this.hostedAi) {
+        if (!this.requiresApiKeys) {
             return this._renderHostedAiIncludedBanner();
         }
 
-        return html`
-            ${this._renderActiveByokBanner()}
-            ${this._renderGeminiKeyField()}
-            ${this._renderOpenRouterKeyField()}
-        `;
+        return html` ${this._renderActiveByokBanner()} ${this._renderGeminiKeyField()} ${this._renderOpenRouterKeyField()} `;
     }
 
     // ── Cloud mode ──
@@ -1524,40 +1379,39 @@ export class MainView extends LitElement {
             <details class="config-section" @toggle=${this._handleConfigToggle}>
                 <summary class="config-summary">
                     <span class="config-summary-text">
-                        <span class="config-summary-title">Transcription</span>
-                        <span class="config-summary-description">Gemini Live connection</span>
+                        <span class="config-summary-title">Screen & voice</span>
+                        <span class="config-summary-description">Required API key</span>
                     </span>
                     ${this._renderConfigChevron()}
                 </summary>
                 <div class="config-content">
                     <div class="form-group">
-                        <label class="form-label">Gemini API Key</label>
+                        <label class="form-label">API key</label>
                         <input
                             type="password"
-                            placeholder="Required"
+                            placeholder="Paste your key"
                             .value=${this._geminiKey}
                             @input=${e => this._saveGeminiKey(e.target.value)}
                             class=${this._keyError ? 'error' : ''}
                         />
                         <div class="form-hint">
-                            <span class="link" @click=${() => this.onExternalLink('https://aistudio.google.com/apikey')}>Get Gemini key</span>
+                            <span class="link" @click=${() => this.onExternalLink('https://aistudio.google.com/apikey')}>Get a key</span>
                         </div>
                     </div>
-
                 </div>
             </details>
 
             <details class="config-section" @toggle=${this._handleConfigToggle}>
                 <summary class="config-summary">
                     <span class="config-summary-text">
-                        <span class="config-summary-title">AI responses</span>
-                        <span class="config-summary-description">Optional OpenRouter key for faster answers</span>
+                        <span class="config-summary-title">Live answers</span>
+                        <span class="config-summary-description">Optional second key</span>
                     </span>
                     ${this._renderConfigChevron()}
                 </summary>
                 <div class="config-content">
                     <div class="form-group">
-                        <label class="form-label">OpenRouter API Key</label>
+                        <label class="form-label">API key</label>
                         <input
                             type="password"
                             placeholder="Optional"
@@ -1565,23 +1419,17 @@ export class MainView extends LitElement {
                             @input=${e => this._saveOpenRouterKey(e.target.value)}
                         />
                         <div class="form-hint">
-                            <span class="link" @click=${() => this.onExternalLink('https://openrouter.ai/keys')}>Get OpenRouter key</span>
+                            <span class="link" @click=${() => this.onExternalLink('https://openrouter.ai/keys')}>Get a key</span>
                         </div>
-                    </div>
-
-                    <div class="config-note">
-                        Answers use Gemini Flash by default. Add an OpenRouter key only if you want a separate response provider.
                     </div>
                 </div>
             </details>
 
             ${this._renderStartButton()} ${this._renderDivider()}
 
-            <!-- Cloud promo intentionally removed from the active UI. -->
-
             <div class="mode-links">
-                <button class="mode-link" @click=${() => this._saveMode('whisper_openrouter')}>Use Whisper + OpenRouter</button>
-                <button class="mode-link" @click=${() => this._saveMode('local')}>Use fully local AI</button>
+                <button class="mode-link" @click=${() => this._saveMode('whisper_openrouter')}>Back to default setup</button>
+                <button class="mode-link" @click=${() => this._saveMode('local')}>Use offline mode</button>
             </div>
         `;
     }
@@ -1625,67 +1473,32 @@ export class MainView extends LitElement {
         `;
     }
 
-    _renderReadinessStrip() {
-        if (!this._readiness) {
-            return '';
-        }
-
-        const cells = [
-            { name: 'Audio', value: this._readiness.audio },
-            { name: 'Screen', value: this._readiness.screen },
-            { name: 'AI', value: this._readiness.ai },
-        ];
-
-        return html`
-            <div class="readiness-strip" aria-label="Session readiness">
-                ${cells.map(
-                    cell => html`
-                        <div class="readiness-cell">
-                            <span class="readiness-name">${cell.name}</span>
-                            <span class="readiness-value ${cell.value?.state || ''}">${cell.value?.label || '—'}</span>
-                        </div>
-                    `
-                )}
-            </div>
-        `;
-    }
-
     _renderAdvancedSection() {
-        const flashFootnote = this.hostedAi
-            ? 'Your pass covers these models. We keep them updated automatically.'
-            : 'Flash models are picked for you. Your API keys cover usage on Gemini and OpenRouter.';
-
         return html`
-            <details class="config-section" @toggle=${this._handleConfigToggle}>
+            <details class="config-section" ?open=${this._advancedOpen} @toggle=${this._handleAdvancedToggle}>
                 <summary class="config-summary">
                     <span class="config-summary-text">
-                        <span class="config-summary-title">AI & transcription</span>
-                        <span class="config-summary-description">Models, keys, and local Whisper</span>
+                        <span class="config-summary-title">Advanced</span>
+                        <span class="config-summary-description">API keys and speech settings</span>
                     </span>
                     ${this._renderConfigChevron()}
                 </summary>
                 <div class="config-content">
                     ${this._renderAiAccessSection()}
-                    ${this._renderFlashModelsPanel({
-                        badge: this.hostedAi ? 'Included' : this.licenseValid ? 'Your keys' : 'Preview',
-                        footnote: flashFootnote,
-                    })}
                     <div class="form-group">
                         <div class="whisper-label-row">
                             <label class="form-label">Speech recognition</label>
                             ${this.whisperDownloading ? html`<div class="whisper-spinner"></div>` : ''}
                         </div>
-                        <select .value=${this._whisperModel} @change=${e => this._saveWhisperModel(e.target.value)}>
-                            <option value="tiny.en" ?selected=${this._whisperModel === 'tiny.en'}>Tiny — fastest (75 MB)</option>
-                            <option value="base.en" ?selected=${this._whisperModel === 'base.en'}>Base — recommended (142 MB)</option>
-                            <option value="small.en" ?selected=${this._whisperModel === 'small.en'}>Small — most accurate (466 MB)</option>
-                        </select>
+                        <ui-select
+                            full-width
+                            .value=${this._whisperModel}
+                            .options=${WHISPER_MODEL_OPTIONS}
+                            ?disabled=${this.whisperDownloading}
+                            @change=${e => this._saveWhisperModel(e.detail.value)}
+                        ></ui-select>
                         <div class="form-hint">
-                            ${
-                                this.whisperDownloading
-                                    ? 'Downloading Whisper model...'
-                                    : 'Runs locally on your Mac. Downloads once on first start.'
-                            }
+                            ${this.whisperDownloading ? 'Downloading...' : 'Runs on your Mac. Downloads once on first start.'}
                         </div>
                     </div>
                 </div>
@@ -1695,11 +1508,7 @@ export class MainView extends LitElement {
 
     _renderWhisperOpenRouterMode() {
         return html`
-            ${this._renderProfileSelector()}
-            ${this._renderContextField()}
-            ${this._renderReadinessStrip()}
-            ${this._renderStartButton()}
-            ${this._renderAdvancedSection()}
+            ${this._renderProfileSelector()} ${this._renderContextField()} ${this._renderStartButton()} ${this._renderAdvancedSection()}
         `;
     }
 
@@ -1707,39 +1516,39 @@ export class MainView extends LitElement {
 
     _renderLocalMode() {
         return html`
-            <div class="config-note">Uses a balanced local model automatically. Download happens on first start.</div>
+            <div class="config-note">Everything runs on your Mac. Files download on first start.</div>
 
             <details class="config-section" @toggle=${this._handleConfigToggle}>
                 <summary class="config-summary">
                     <span class="config-summary-text">
-                        <span class="config-summary-title">Transcription</span>
-                        <span class="config-summary-description">Whisper speech-to-text model</span>
+                        <span class="config-summary-title">Speech recognition</span>
+                        <span class="config-summary-description">Accuracy vs speed</span>
                     </span>
                     ${this._renderConfigChevron()}
                 </summary>
                 <div class="config-content">
                     <div class="form-group">
                         <div class="whisper-label-row">
-                            <label class="form-label">Whisper Model</label>
+                            <label class="form-label">Quality</label>
                             ${this.whisperDownloading ? html`<div class="whisper-spinner"></div>` : ''}
                         </div>
-                        <select .value=${this._whisperModel} @change=${e => this._saveWhisperModel(e.target.value)}>
-                            <option value="tiny.en" ?selected=${this._whisperModel === 'tiny.en'}>Tiny English (75 MB, fastest)</option>
-                            <option value="base.en" ?selected=${this._whisperModel === 'base.en'}>Base English (142 MB)</option>
-                            <option value="small.en" ?selected=${this._whisperModel === 'small.en'}>Small English (466 MB, most accurate)</option>
-                        </select>
-                        <div class="form-hint">${this.whisperDownloading ? 'Downloading model...' : 'Downloaded automatically on first use'}</div>
+                        <ui-select
+                            full-width
+                            .value=${this._whisperModel}
+                            .options=${WHISPER_MODEL_OPTIONS_LOCAL}
+                            ?disabled=${this.whisperDownloading}
+                            @change=${e => this._saveWhisperModel(e.detail.value)}
+                        ></ui-select>
+                        <div class="form-hint">${this.whisperDownloading ? 'Downloading...' : 'Downloaded automatically on first use'}</div>
                     </div>
                 </div>
             </details>
 
             ${this._renderStartButton()} ${this._renderDivider()}
 
-            <!-- Cloud promo intentionally removed from the active UI. -->
-
             <div class="mode-links">
-                <button class="mode-link" @click=${() => this._saveMode('byok')}>Use own API keys</button>
-                <button class="mode-link" @click=${() => this._saveMode('whisper_openrouter')}>Use Whisper + OpenRouter</button>
+                <button class="mode-link" @click=${() => this._saveMode('byok')}>Use your own API keys</button>
+                <button class="mode-link" @click=${() => this._saveMode('whisper_openrouter')}>Back to default setup</button>
             </div>
         `;
     }
@@ -1748,17 +1557,31 @@ export class MainView extends LitElement {
 
     render() {
         const licenseHint = !this.licenseValid
-            ? 'A pass is required to start. Full passes include AI; BYOK uses your own keys.'
-            : this.hostedAi
-              ? 'Your pass includes AI. Add context above, then start your session.'
-              : 'Add your API keys under AI & transcription if needed, then start.';
+            ? 'Unlock a pass to start.'
+            : !this.requiresApiKeys
+              ? 'Add context above, then press Start.'
+              : 'Add your API keys below, then press Start.';
+
+        let modeContent;
+        switch (this._mode) {
+            case 'byok':
+                modeContent = this._renderByokMode();
+                break;
+            case 'local':
+                modeContent = this._renderLocalMode();
+                break;
+            case 'whisper_openrouter':
+            default:
+                modeContent = this._renderWhisperOpenRouterMode();
+                break;
+        }
 
         return html`
             <div class="form-scroll">
                 <div class="form-wrapper">
                     <div class="page-title">What are you doing?</div>
                     <div class="page-subtitle">Know what to say next. ${licenseHint}</div>
-                    ${this._renderWhisperOpenRouterMode()}
+                    ${modeContent}
                 </div>
             </div>
         `;
@@ -1775,34 +1598,23 @@ export class MainView extends LitElement {
 
                     <div class="help-content">
                         <div class="help-section">
-                            <div class="help-section-title">Native local AI</div>
+                            <div class="help-section-title">Offline mode</div>
                             <div class="help-section-text">
-                                Menace Agent runs llama.cpp and whisper.cpp directly. Everything stays on your computer — no external AI service or
-                                Ollama installation is required.
+                                Everything runs on your computer. No external service or extra apps are required.
                             </div>
                         </div>
 
                         <div class="help-section">
-                            <div class="help-section-title">Automatic setup</div>
+                            <div class="help-section-title">First-time setup</div>
                             <div class="help-section-text">
-                                The correct native runners, selected Whisper model, and language model are downloaded and checksum-verified on first
-                                use. They are stored in the Menace Agent config directory.
+                                Required files download and verify automatically on first start. They stay in the Menace Agent config directory.
                             </div>
                         </div>
 
                         <div class="help-section">
-                            <div class="help-section-title">Default model</div>
-                            <div class="help-models">
-                                <div class="help-model">
-                                    <span class="help-model-name">Qwen3.5 4B Q4_K_M</span><span>About 2.7 GB — balanced local quality and speed</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="help-section">
-                            <div class="help-section-title">Whisper</div>
+                            <div class="help-section-title">Downloads</div>
                             <div class="help-section-text">
-                                The selected whisper.cpp model is downloaded automatically once and kept in the config directory.
+                                Speech and answer models download automatically on first use and stay in the Menace Agent config directory.
                             </div>
                         </div>
 

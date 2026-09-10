@@ -34,6 +34,10 @@
                 line-height: 1.55;
                 min-height: 100vh;
                 padding: 48px 24px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                -webkit-font-smoothing: antialiased;
             }
             body::before {
                 content: '';
@@ -44,7 +48,7 @@
             }
             .shell {
                 position: relative;
-                max-width: 28rem;
+                width: min(100%, 36rem);
                 margin: 0 auto;
             }
             .back {
@@ -80,35 +84,44 @@
                 color: var(--muted);
             }
             h1 {
-                font-size: 26px;
+                font-size: clamp(1.5rem, 4vw, 1.75rem);
                 font-weight: 600;
                 letter-spacing: -0.02em;
-                margin-bottom: 10px;
+                margin-bottom: 12px;
             }
             .lead {
                 color: var(--secondary);
-                font-size: 14px;
-                margin-bottom: 24px;
+                font-size: 15px;
+                margin-bottom: 28px;
+                max-width: 34ch;
             }
             .card {
                 background: var(--surface);
                 border: 1px solid var(--border);
                 border-radius: var(--radius-sm);
-                padding: 20px;
-                margin-bottom: 20px;
+                padding: 24px;
+                margin-bottom: 24px;
             }
-            .card strong {
+            .card-title {
                 display: block;
-                margin-bottom: 12px;
+                margin-bottom: 16px;
                 font-size: 14px;
+                font-weight: 600;
+                color: var(--cream);
             }
             ol {
                 color: var(--secondary);
                 font-size: 14px;
-                padding-left: 1.25rem;
+                padding-left: 1.35rem;
+                display: grid;
+                gap: 12px;
             }
             li {
-                margin: 8px 0;
+                padding-left: 0.15rem;
+            }
+            li strong {
+                color: var(--cream);
+                font-weight: 600;
             }
             code {
                 font-family: var(--font-mono);
@@ -125,14 +138,16 @@
                 color: var(--secondary);
             }
             .btn {
-                display: inline-block;
-                margin-top: 16px;
-                padding: 12px 18px;
+                display: block;
+                width: 100%;
+                margin-top: 20px;
+                padding: 13px 18px;
                 background: var(--tally);
                 color: var(--cream);
                 border-radius: var(--radius-sm);
                 font-size: 14px;
                 font-weight: 600;
+                text-align: center;
                 text-decoration: none;
             }
             .btn:hover {
@@ -141,8 +156,8 @@
             }
             .hint {
                 color: var(--muted);
-                font-size: 12px;
-                margin-top: 16px;
+                font-size: 13px;
+                line-height: 1.6;
             }
         </style>
     </head>
@@ -157,11 +172,11 @@
             <p class="lead">Polar doesn’t show the key on this page. It’s in your customer portal or confirmation email.</p>
 
             <div class="card">
-                <strong>Activate Menace Agent</strong>
+                <span class="card-title">Activate Menace Agent</span>
                 <ol>
                     <li>Open the <a href="https://polar.sh/menace/portal">customer portal</a> (same email as checkout).</li>
                     <li>Go to <strong>Purchases</strong> and copy your <code>MENACE-…</code> key.</li>
-                    <li>Paste it in the app under <strong>License → Activate</strong>.</li>
+                    <li>Paste it in the app under <strong>License&nbsp;→&nbsp;Activate</strong>.</li>
                 </ol>
                 <a class="btn" href="https://polar.sh/menace/portal">Open customer portal</a>
             </div>

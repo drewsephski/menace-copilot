@@ -1,7 +1,10 @@
 import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
+import { clickableControlStyles } from '../views/sharedPageStyles.js';
 
 export class AppHeader extends LitElement {
-    static styles = css`
+    static styles = [
+        clickableControlStyles,
+        css`
         * {
             font-family: var(--font);
             cursor: default;
@@ -124,7 +127,8 @@ export class AppHeader extends LitElement {
         .update-button:hover {
             background: var(--tally-dim);
         }
-    `;
+    `,
+    ];
 
     static properties = {
         currentView: { type: String },

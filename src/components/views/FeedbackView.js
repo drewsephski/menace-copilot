@@ -1,10 +1,11 @@
 import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
-import { unifiedPageStyles } from './sharedPageStyles.js';
+import { clickableControlStyles, unifiedPageStyles } from './sharedPageStyles.js';
 
 const FEEDBACK_FORM_URL = 'https://forms.gle/1JPoh81mUPkJMvje7';
 
 export class FeedbackView extends LitElement {
     static styles = [
+        clickableControlStyles,
         unifiedPageStyles,
         css`
             .unified-wrap {

@@ -1,8 +1,9 @@
 import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
-import { unifiedPageStyles } from './sharedPageStyles.js';
+import { clickableControlStyles, unifiedPageStyles } from './sharedPageStyles.js';
 
 export class HelpView extends LitElement {
     static styles = [
+        clickableControlStyles,
         unifiedPageStyles,
         css`
             .shortcut-grid {

@@ -161,6 +161,19 @@
                 appearance: none;
             }
 
+            button,
+            [role='button'],
+            a[href] {
+                cursor: pointer;
+                -webkit-app-region: no-drag;
+            }
+
+            button *:not(input):not(textarea):not(select),
+            [role='button'] *:not(input):not(textarea):not(select) {
+                pointer-events: none;
+                cursor: inherit;
+            }
+
             ::selection {
                 background: var(--tally);
                 color: var(--text-primary);
@@ -209,9 +222,8 @@
         <script src="assets/marked-4.3.0.min.js"></script>
         <script src="assets/highlight-11.9.0.min.js"></script>
         <link rel="stylesheet" href="assets/highlight-vscode-dark.min.css" />
-        <script type="module" src="components/app/CheatingDaddyApp.js"></script>
-
         <cheating-daddy-app id="cheatingDaddy"></cheating-daddy-app>
         <script src="utils/renderer.js"></script>
+        <script type="module" src="components/app/CheatingDaddyApp.js"></script>
     </body>
 </html>

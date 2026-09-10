@@ -1,9 +1,13 @@
 import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
+import { clickableControlStyles } from '../views/sharedPageStyles.js';
 
 export class PremiumLicenseInput extends LitElement {
-    static styles = css`
+    static styles = [
+        clickableControlStyles,
+        css`
         :host {
             display: block;
+            -webkit-app-region: no-drag;
         }
 
         .field {
@@ -105,6 +109,8 @@ export class PremiumLicenseInput extends LitElement {
         }
 
         .activate-button {
+            position: relative;
+            z-index: 1;
             flex-shrink: 0;
             border: none;
             border-radius: var(--radius-sm);
@@ -114,10 +120,16 @@ export class PremiumLicenseInput extends LitElement {
             font-size: var(--font-size-sm);
             font-weight: var(--font-weight-semibold);
             cursor: pointer;
+            -webkit-app-region: no-drag;
             transition:
                 background var(--transition),
                 transform var(--transition),
                 opacity var(--transition);
+        }
+
+        .activate-label {
+            display: inline-block;
+            pointer-events: none;
         }
 
         .activate-button:hover:not(:disabled) {
@@ -131,6 +143,12 @@ export class PremiumLicenseInput extends LitElement {
         .activate-button:disabled {
             opacity: 0.45;
             cursor: not-allowed;
+            pointer-events: none;
+        }
+
+        .toggle-visibility * {
+            pointer-events: none;
+            cursor: inherit;
         }
 
         .hint {
@@ -152,7 +170,8 @@ export class PremiumLicenseInput extends LitElement {
                 width: 100%;
             }
         }
-    `;
+    `,
+    ];
 
     static properties = {
         value: { type: String },
@@ -252,8 +271,8 @@ export class PremiumLicenseInput extends LitElement {
                             }
                         </button>
                     </div>
-                    <button type="button" class="activate-button" ?disabled=${this.busy} @click=${() => this._handleActivate()}>
-                        ${this.busy ? 'Checking…' : 'Activate'}
+                    <button type="button" class="activate-button" ?disabled=${this.busy} @click=${this._handleActivate}>
+                        <span class="activate-label">${this.busy ? 'Checking…' : 'Activate'}</span>
                     </button>
                 </div>
                 ${message ? html`<div class="hint ${this.error ? 'error' : ''}">${message}</div>` : ''}

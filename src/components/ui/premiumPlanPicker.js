@@ -62,6 +62,12 @@ export class PremiumPlanPicker extends LitElement {
             box-sizing: border-box;
         }
 
+        .plan-card *,
+        .checkout-cta * {
+            pointer-events: none;
+            cursor: inherit;
+        }
+
         .plan-card {
             position: relative;
             z-index: 1;

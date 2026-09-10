@@ -235,6 +235,10 @@ async function ensureProduct(organizationId, spec, existingProducts, benefitsByL
     return product;
 }
 
+function checkoutLinkRedirectUrl(linkId) {
+    return `${API_ORIGIN}/v1/checkout-links/${linkId}/redirect`;
+}
+
 async function ensureCheckoutLink(organizationId, product, label, existingLinks) {
     const found = existingLinks.find(link => {
         if (link.label === label) return true;
@@ -246,15 +250,16 @@ async function ensureCheckoutLink(organizationId, product, label, existingLinks)
         success_url: SUCCESS_URL,
     };
 
-    if (found?.url) {
+    if (found?.id) {
+        const redirectUrl = checkoutLinkRedirectUrl(found.id);
         if (DRY_RUN) {
-            report.checkoutLinks.update.push({ label, id: found.id, url: found.url });
-            return found.url;
+            report.checkoutLinks.update.push({ label, id: found.id, url: redirectUrl });
+            return redirectUrl;
         }
 
         await polarRequest('PATCH', `/v1/checkout-links/${found.id}`, linkPayload);
         console.log(`Updated checkout link: ${label}`);
-        return found.url;
+        return redirectUrl;
     }
 
     if (DRY_RUN) {
@@ -270,7 +275,7 @@ async function ensureCheckoutLink(organizationId, product, label, existingLinks)
     });
 
     console.log(`Created checkout link: ${label}`);
-    return created.url;
+    return checkoutLinkRedirectUrl(created.id);
 }
 
 async function main() {

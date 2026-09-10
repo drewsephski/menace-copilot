@@ -75,6 +75,39 @@ function isAllowedPolarUrl(rawUrl) {
     return parsed.protocol === 'https:' && ALLOWED_CHECKOUT_HOSTS.has(parsed.hostname);
 }
 
+function extractCheckoutLinkId(rawUrl) {
+    if (typeof rawUrl !== 'string' || rawUrl.length === 0) {
+        return '';
+    }
+
+    try {
+        const parsed = new URL(rawUrl);
+        if (parsed.hostname === 'buy.polar.sh') {
+            const linkId = parsed.pathname.replace(/^\//, '');
+            return linkId.startsWith('polar_cl_') ? linkId : '';
+        }
+
+        const match = parsed.pathname.match(/\/v1\/checkout-links\/(polar_cl_[^/]+)/);
+        return match ? match[1] : '';
+    } catch {
+        return '';
+    }
+}
+
+/**
+ * Polar's buy.polar.sh marketing URLs can 302 to the homepage instead of checkout.
+ * The API redirect endpoint creates a fresh checkout session and is the reliable entry point.
+ */
+function resolveCheckoutRedirectUrl(rawUrl) {
+    const linkId = extractCheckoutLinkId(rawUrl);
+    if (!linkId) {
+        return rawUrl;
+    }
+
+    const origin = getPolarApiOrigin();
+    return `${origin}/v1/checkout-links/${linkId}/redirect`;
+}
+
 function validatePolarConfig() {
     const problems = [];
 
@@ -109,5 +142,7 @@ module.exports = {
     POLAR_CONFIG,
     getPolarApiOrigin,
     isAllowedPolarUrl,
+    extractCheckoutLinkId,
+    resolveCheckoutRedirectUrl,
     validatePolarConfig,
 };

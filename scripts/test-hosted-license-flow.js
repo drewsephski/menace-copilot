@@ -43,7 +43,7 @@ async function assertHostedPath(label, licenseStatus) {
         throw new Error(`${label}: user OpenRouter key should be empty for hosted test`);
     }
     if (!isHostedOpenRouterConfigured()) {
-        throw new Error(`${label}: OPENROUTER_API_KEY missing from .env`);
+        throw new Error(`${label}: hosted AI gateway URL is not configured (MENACE_HOSTED_API_BASE_URL)`);
     }
     if (!access.available || access.source !== 'hosted') {
         throw new Error(`${label}: expected hosted OpenRouter access`);

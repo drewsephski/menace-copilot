@@ -43,13 +43,18 @@ function getOpenRouterAccess() {
         return { available: true, source: 'user', hostedConfigured: isHostedGatewayConfigured() };
     }
 
-    if (licensedHostedAccess && isHostedGatewayConfigured()) {
-        return { available: true, source: 'hosted', hostedConfigured: true };
+    if (licensedHostedAccess) {
+        const hostedConfigured = isHostedGatewayConfigured();
+        return {
+            available: true,
+            source: hostedConfigured ? 'hosted' : 'hosted-unconfigured',
+            hostedConfigured,
+        };
     }
 
     return {
         available: false,
-        source: licensedHostedAccess ? 'hosted-unconfigured' : 'none',
+        source: 'none',
         hostedConfigured: isHostedGatewayConfigured(),
     };
 }
