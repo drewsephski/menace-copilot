@@ -7,6 +7,9 @@ Menace listens to the conversation, understands what's on screen, and gives you 
 > [!NOTE]
 > Use the latest macOS. Older versions have limited system-audio support.
 
+> [!IMPORTANT]
+> **Beta builds are Apple Silicon (arm64) only.** Intel Macs are not supported in the first external beta.
+
 > [!NOTE]
 > During testing it will not answer if you ask something yourself. Simulate another participant asking a question — that is what it answers.
 
@@ -61,13 +64,20 @@ npm run install:macos
 
 The packaged app installs to `~/Applications/Menace Agent.app`. Enable it under **System Settings → Privacy & Security → Screen & System Audio Recording** (and **System Audio Recording Only** on macOS 26+).
 
-To build a distributable DMG:
+To build a signed, notarized distributable DMG for beta testers (Apple Silicon):
 
 ```bash
-npm run make:macos
+# Requires APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, and APPLE_TEAM_ID
+npm run beta:macos
 ```
 
-Artifacts land in `out/`.
+For unsigned local packaging only:
+
+```bash
+SKIP_NOTARIZE=1 npm run beta:macos
+```
+
+Artifacts land in `out/`. Beta DMGs contain the notarized `Menace Agent.app` bundle from `out/Menace Agent-darwin-arm64/`.
 
 ## Usage
 

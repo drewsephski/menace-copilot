@@ -22,6 +22,11 @@ const MAX_TEMPERATURE = 1;
 const DEFAULT_TEMPERATURE = 0.4;
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX_REQUESTS = 30;
+const DAILY_REQUEST_LIMIT = 500;
+const DAILY_TOKEN_BUDGET = 250_000;
+
+// Defense in depth: also set an account-level monthly spend ceiling in the OpenRouter dashboard.
+// See https://openrouter.ai/settings/limits
 
 function loadBenefitCatalog() {
     if (process.env.MENACE_POLAR_BENEFITS_JSON) {
@@ -65,12 +70,18 @@ function clampMaxTokens(value) {
     return Math.min(MAX_OUTPUT_TOKENS, Math.floor(parsed));
 }
 
-function resolveModel(requested) {
-    if (typeof requested !== 'string') {
-        return DEFAULT_MODEL;
+function getProductionModel() {
+    const configured = typeof process.env.MENACE_GATEWAY_MODEL === 'string'
+        ? process.env.MENACE_GATEWAY_MODEL.trim()
+        : '';
+    if (configured && ALLOWED_MODELS.has(configured)) {
+        return configured;
     }
-    const model = requested.trim();
-    return ALLOWED_MODELS.has(model) ? model : DEFAULT_MODEL;
+    return DEFAULT_MODEL;
+}
+
+function resolveModel(_requested) {
+    return getProductionModel();
 }
 
 module.exports = {
@@ -83,9 +94,12 @@ module.exports = {
     MAX_OUTPUT_TOKENS,
     RATE_LIMIT_WINDOW_MS,
     RATE_LIMIT_MAX_REQUESTS,
+    DAILY_REQUEST_LIMIT,
+    DAILY_TOKEN_BUDGET,
     loadBenefitCatalog,
     getPolarApiOrigin,
     clampTemperature,
     clampMaxTokens,
+    getProductionModel,
     resolveModel,
 };

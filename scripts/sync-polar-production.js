@@ -8,7 +8,7 @@
  *   POLAR_ACCESS_TOKEN=...   (production org token from polar.sh → Settings → Developers)
  *
  * Usage:
- *   node scripts/sync-polar-production.js
+ *   node scripts/sync-polar-production.js --dry-run
  *   node scripts/sync-polar-production.js --write
  */
 
@@ -23,37 +23,49 @@ const TOKEN = process.env.POLAR_ACCESS_TOKEN || '';
 const ORG_SLUG = process.env.POLAR_ORG_SLUG || 'menace';
 const SUCCESS_URL = process.env.POLAR_SUCCESS_URL || 'https://menace-agent.vercel.app/success.html';
 const WRITE = process.argv.includes('--write');
+const DRY_RUN = process.argv.includes('--dry-run') || !WRITE;
 
 const PRODUCT_SPECS = [
     {
         sku: 'search_pass',
-        name: 'Menace Search Pass',
-        description: '90 days. Live interview autocue with included AI answers, Gemini screen context, and local Whisper.',
+        name: '90-Day Pass',
+        description:
+            '90 days of Menace Agent with included hosted AI answers, screen context, and local Whisper transcription.',
         recurring: false,
         priceAmount: 7900,
         licenseLabel: 'Menace overlay license (90-day)',
         licenseExpires: { days: 90 },
+        hostedAi: true,
     },
     {
         sku: 'monthly',
-        name: 'Menace Monthly',
-        description: 'Cancel anytime. Included AI answers, Gemini screen context, and local Whisper transcription.',
+        name: 'Monthly',
+        description:
+            'Monthly Menace Agent with included hosted AI answers, screen context, and local Whisper transcription.',
         recurring: true,
         priceAmount: 3900,
         licenseLabel: 'Menace overlay license (monthly)',
         licenseExpires: null,
+        hostedAi: true,
     },
     {
         sku: 'byok_monthly',
-        name: 'Menace BYOK',
+        name: 'BYOK',
         description:
-            'App license only — $15/mo. Use your own Gemini and OpenRouter keys. Required for overlay, Gemini Live, and screen context.',
+            'Bring your own API keys. App license for overlay, Gemini Live, and screen context without hosted AI.',
         recurring: true,
         priceAmount: 1500,
         licenseLabel: 'Menace BYOK license (monthly)',
         licenseExpires: null,
+        hostedAi: false,
     },
 ];
+
+const report = {
+    products: { create: [], update: [], unchanged: [] },
+    benefits: { create: [], attach: [] },
+    checkoutLinks: { create: [], update: [] },
+};
 
 async function polarRequest(method, pathname, body) {
     const response = await fetch(`${API_ORIGIN}${pathname}`, {
@@ -98,10 +110,25 @@ async function listBenefits() {
     return data.items || [];
 }
 
+function productNeedsUpdate(product, spec) {
+    const metadataSku = product.metadata?.sku || '';
+    return product.name !== spec.name || product.description !== spec.description || metadataSku !== spec.sku;
+}
+
 async function ensureProductBenefits(productId, benefitId, productName) {
+    if (DRY_RUN && String(productId).startsWith('dry-run-')) {
+        report.benefits.attach.push({ productId, benefitId, productName });
+        return;
+    }
+
     const product = await polarRequest('GET', `/v1/products/${productId}`);
     const attached = (product.benefits || []).some(item => item.id === benefitId);
     if (attached) {
+        return;
+    }
+
+    if (DRY_RUN) {
+        report.benefits.attach.push({ productId, benefitId, productName });
         return;
     }
 
@@ -117,7 +144,6 @@ async function createLicenseBenefit(label, expiresDays) {
         description: label,
         properties: {
             prefix: 'MENACE',
-            // No device activation slots — keys validate via /validate (simpler for desktop app).
             activations: null,
             ...(expiresDays
                 ? {
@@ -130,9 +156,13 @@ async function createLicenseBenefit(label, expiresDays) {
         },
     };
 
-    // Org tokens infer organization — do not pass organization_id in body
-    const benefit = await polarRequest('POST', `/v1/benefits/`, body);
+    if (DRY_RUN) {
+        const placeholder = { id: `dry-run-benefit-${label}`, description: label };
+        report.benefits.create.push({ label, expiresDays });
+        return placeholder;
+    }
 
+    const benefit = await polarRequest('POST', `/v1/benefits/`, body);
     return benefit;
 }
 
@@ -150,40 +180,58 @@ async function ensureBenefit(spec, benefitsByLabel) {
 }
 
 async function ensureProduct(organizationId, spec, existingProducts, benefitsByLabel) {
-    let product = existingProducts.find(
-        item => item.metadata?.sku === spec.sku || item.name === spec.name
-    );
+    let product = existingProducts.find(item => item.metadata?.sku === spec.sku || item.name === spec.name);
 
     const benefit = await ensureBenefit(spec, benefitsByLabel);
 
     if (!product) {
-        product = await polarRequest('POST', '/v1/products/', {
-            name: spec.name,
-            description: spec.description,
-            metadata: { sku: spec.sku },
-            prices: [
-                {
-                    amount_type: 'fixed',
-                    price_amount: spec.priceAmount,
-                    price_currency: 'usd',
-                    ...(spec.recurring
-                        ? {
-                              type: 'recurring',
-                              recurring_interval: 'month',
-                              recurring_interval_count: 1,
-                          }
-                        : { type: 'one_time' }),
-                },
-            ],
-        });
-
-        console.log(`Created product: ${spec.name} (${product.id})`);
+        if (DRY_RUN) {
+            report.products.create.push({ sku: spec.sku, name: spec.name });
+            product = { id: `dry-run-product-${spec.sku}`, name: spec.name, metadata: { sku: spec.sku } };
+        } else {
+            product = await polarRequest('POST', '/v1/products/', {
+                name: spec.name,
+                description: spec.description,
+                metadata: { sku: spec.sku },
+                prices: [
+                    {
+                        amount_type: 'fixed',
+                        price_amount: spec.priceAmount,
+                        price_currency: 'usd',
+                        ...(spec.recurring
+                            ? {
+                                  type: 'recurring',
+                                  recurring_interval: 'month',
+                                  recurring_interval_count: 1,
+                              }
+                            : { type: 'one_time' }),
+                    },
+                ],
+            });
+            console.log(`Created product: ${spec.name} (${product.id})`);
+        }
+    } else if (productNeedsUpdate(product, spec)) {
+        if (DRY_RUN) {
+            report.products.update.push({
+                sku: spec.sku,
+                id: product.id,
+                from: { name: product.name, description: product.description },
+                to: { name: spec.name, description: spec.description },
+            });
+        } else {
+            product = await polarRequest('PATCH', `/v1/products/${product.id}`, {
+                name: spec.name,
+                description: spec.description,
+                metadata: { ...(product.metadata || {}), sku: spec.sku },
+            });
+            console.log(`Updated product: ${spec.name} (${product.id})`);
+        }
     } else {
+        report.products.unchanged.push({ sku: spec.sku, id: product.id, name: product.name });
         console.log(`Found product: ${spec.name} (${product.id})`);
     }
 
     await ensureProductBenefits(product.id, benefit.id, spec.name);
-
     return product;
 }
 
@@ -199,9 +247,19 @@ async function ensureCheckoutLink(organizationId, product, label, existingLinks)
     };
 
     if (found?.url) {
+        if (DRY_RUN) {
+            report.checkoutLinks.update.push({ label, id: found.id, url: found.url });
+            return found.url;
+        }
+
         await polarRequest('PATCH', `/v1/checkout-links/${found.id}`, linkPayload);
         console.log(`Updated checkout link: ${label}`);
         return found.url;
+    }
+
+    if (DRY_RUN) {
+        report.checkoutLinks.create.push({ label, productId: product.id });
+        return `https://dry-run.polar.sh/${label}`;
     }
 
     const created = await polarRequest('POST', '/v1/checkout-links/', {
@@ -222,6 +280,7 @@ async function main() {
 
     const org = await findOrganization();
     console.log(`Organization: ${org.name} (${org.id}) slug=${org.slug} server=${SERVER}`);
+    console.log(`Mode: ${DRY_RUN ? 'dry-run/report' : 'write'}`);
 
     const [products, links, benefits] = await Promise.all([
         listProducts(org.id),
@@ -242,7 +301,7 @@ async function main() {
             benefitCatalog[spec.sku] = {
                 id: benefit.id,
                 label: spec.licenseLabel,
-                hostedAi: spec.sku !== 'byok_monthly',
+                hostedAi: spec.hostedAi,
             };
         }
     }
@@ -255,13 +314,14 @@ async function main() {
     };
 
     console.log('\nGenerated Polar config:\n', JSON.stringify(generated, null, 2));
+    console.log('\nSync report:\n', JSON.stringify(report, null, 2));
 
     if (WRITE) {
         const outPath = path.join(__dirname, '..', 'src', 'utils', 'polarConfig.generated.json');
         fs.writeFileSync(outPath, `${JSON.stringify(generated, null, 4)}\n`, 'utf8');
         console.log(`\nWrote ${outPath}`);
     } else {
-        console.log('\nRun with --write to save src/utils/polarConfig.generated.json');
+        console.log('\nDry-run only. Run with --write to save src/utils/polarConfig.generated.json');
     }
 }
 

@@ -92,6 +92,9 @@ src/utils/polarConfig.generated.json
 # Vite
 .vite/
 
+# Live eval output (generated locally)
+.eval-output/
+
 # Electron-Forge
 out/
 .specstory

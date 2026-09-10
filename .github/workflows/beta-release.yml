@@ -16,6 +16,10 @@ jobs:
             MENACE_RELEASE_PAGE_URL: ${{ vars.MENACE_RELEASE_PAGE_URL }}
             MENACE_LOCAL_AI_BINARIES_BASE_URL: ${{ vars.MENACE_LOCAL_AI_BINARIES_BASE_URL }}
             MENACE_HOSTED_API_BASE_URL: ${{ vars.MENACE_HOSTED_API_BASE_URL }}
+            APPLE_ID: ${{ secrets.APPLE_ID }}
+            APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+            APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+            SKIP_NOTARIZE: ${{ inputs.skip_notarize == 'true' && '1' || '' }}
         steps:
             - uses: actions/checkout@v4
             - uses: actions/setup-node@v4
@@ -24,17 +28,8 @@ jobs:
                   cache: npm
             - run: npm ci
             - run: npm run check
-            - name: Package macOS app
-              run: npm run package:macos
-            - name: Verify packaged artifact
-              run: npm run verify:package
-            - name: Codesign assessment
-              run: |
-                  APP="out/Menace Agent-darwin-arm64/Menace Agent.app"
-                  codesign --verify --deep --strict --verbose=2 "$APP"
-                  spctl --assess --verbose=4 --type execute "$APP" || true
-            - name: Create DMG
-              run: npx electron-forge make --platform=darwin --skip-package
+            - name: Build notarized beta release (Apple Silicon)
+              run: npm run beta:macos
             - name: Upload beta artifacts
               uses: actions/upload-artifact@v4
               with:

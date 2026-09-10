@@ -13,9 +13,8 @@ const validateChatRequest = require(path.join(
 )).validateChatRequest;
 
 describe('hosted gateway request validation', () => {
-    test('allows approved model and clamps unsafe parameters', () => {
+    test('selects production model server-side and clamps unsafe parameters', () => {
         const result = validateChatRequest({
-            model: 'google/gemini-3.5-flash-lite',
             messages: [{ role: 'user', content: 'Hello' }],
             temperature: 9,
             max_tokens: 999999,
@@ -27,9 +26,18 @@ describe('hosted gateway request validation', () => {
         assert.equal(result.payload.max_tokens, 4096);
     });
 
-    test('rejects arbitrary provider parameters', () => {
+    test('ignores unsupported client model selection and uses production model', () => {
         const result = validateChatRequest({
             model: 'openai/gpt-4o',
+            messages: [{ role: 'user', content: 'Hello' }],
+        });
+
+        assert.equal(result.ok, true);
+        assert.equal(result.payload.model, 'google/gemini-3.5-flash-lite');
+    });
+
+    test('rejects arbitrary provider parameters', () => {
+        const result = validateChatRequest({
             provider: { order: ['openai'] },
             messages: [{ role: 'user', content: 'Hello' }],
         });

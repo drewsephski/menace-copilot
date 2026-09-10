@@ -2,8 +2,7 @@
 
 const { extractBearerToken, validateLicenseKey } = require('../../../lib/polarLicense');
 const { validateChatRequest } = require('../../../lib/validateChatRequest');
-const { checkRateLimit } = require('../../../lib/rateLimit');
-const { RATE_LIMIT_WINDOW_MS, RATE_LIMIT_MAX_REQUESTS } = require('../../../lib/gatewayConfig');
+const { checkAndConsumeQuota } = require('../../../lib/quotaStore');
 
 function jsonError(status, message, extra = {}) {
     return new Response(JSON.stringify({ error: { message, ...extra } }), {
@@ -62,12 +61,18 @@ module.exports = async function handler(request) {
         return jsonError(status, error.message || 'License validation failed');
     }
 
-    const rate = checkRateLimit(licenseKey, {
-        windowMs: RATE_LIMIT_WINDOW_MS,
-        maxRequests: RATE_LIMIT_MAX_REQUESTS,
+    const quota = await checkAndConsumeQuota({
+        licenseKey,
+        messages: validated.payload.messages,
+        maxTokens: validated.payload.max_tokens,
     });
-    if (!rate.allowed) {
-        return jsonError(429, 'Rate limit exceeded', { retry_after: rate.retryAfterSec });
+    if (!quota.allowed) {
+        const status = quota.reason === 'quota_storage_unavailable' ? 503 : 429;
+        const message =
+            quota.reason === 'quota_storage_unavailable'
+                ? 'Hosted AI quota service unavailable'
+                : 'Rate or quota limit exceeded';
+        return jsonError(status, message, { retry_after: quota.retryAfterSec, reason: quota.reason });
     }
 
     try {

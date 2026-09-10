@@ -1,0 +1,76 @@
+const { describe, test, beforeEach, afterEach } = require('node:test');
+const assert = require('node:assert/strict');
+const path = require('path');
+
+const quotaStore = require(path.join(__dirname, '..', '..', '..', 'site', 'lib', 'quotaStore'));
+
+describe('quotaStore', () => {
+    const originalFetch = global.fetch;
+    const counters = new Map();
+
+    beforeEach(() => {
+        counters.clear();
+        process.env.KV_REST_API_URL = 'https://example.upstash.io';
+        process.env.KV_REST_API_TOKEN = 'test-token';
+
+        global.fetch = async (_url, options) => {
+            const command = JSON.parse(options.body);
+            const [op, key, value] = command;
+
+            if (op === 'INCR') {
+                const next = (counters.get(key) || 0) + 1;
+                counters.set(key, next);
+                return { ok: true, json: async () => ({ result: next }) };
+            }
+
+            if (op === 'INCRBY') {
+                const next = (counters.get(key) || 0) + Number(value);
+                counters.set(key, next);
+                return { ok: true, json: async () => ({ result: next }) };
+            }
+
+            if (op === 'EXPIRE' || op === 'TTL') {
+                return { ok: true, json: async () => ({ result: 60 }) };
+            }
+
+            return { ok: true, json: async () => ({ result: null }) };
+        };
+    });
+
+    afterEach(() => {
+        global.fetch = originalFetch;
+        delete process.env.KV_REST_API_URL;
+        delete process.env.KV_REST_API_TOKEN;
+    });
+
+    test('hashes license keys without exposing raw values', () => {
+        const hash = quotaStore.hashLicenseKey('MENACE_test_key');
+        assert.equal(hash.length, 64);
+        assert.notEqual(hash, 'MENACE_test_key');
+    });
+
+    test('allows requests under quota limits', async () => {
+        const result = await quotaStore.checkAndConsumeQuota({
+            licenseKey: 'MENACE_allowed',
+            messages: [{ role: 'user', content: 'Hello' }],
+            maxTokens: 256,
+        });
+
+        assert.equal(result.allowed, true);
+        assert.equal(typeof result.licenseHash, 'string');
+    });
+
+    test('fails safely when quota storage is unavailable', async () => {
+        delete process.env.KV_REST_API_URL;
+        delete process.env.KV_REST_API_TOKEN;
+
+        const result = await quotaStore.checkAndConsumeQuota({
+            licenseKey: 'MENACE_missing_store',
+            messages: [{ role: 'user', content: 'Hello' }],
+            maxTokens: 256,
+        });
+
+        assert.equal(result.allowed, false);
+        assert.equal(result.reason, 'quota_storage_unavailable');
+    });
+});

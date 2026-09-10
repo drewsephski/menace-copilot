@@ -5,7 +5,7 @@ const {
     MAX_MESSAGE_CHARS,
     MAX_TOTAL_CHARS,
     MAX_IMAGE_CHARS,
-    resolveModel,
+    getProductionModel,
     clampTemperature,
     clampMaxTokens,
 } = require('./gatewayConfig');
@@ -72,7 +72,19 @@ function validateChatRequest(body) {
         return { ok: false, status: 400, error: 'Request payload too large' };
     }
 
-    const blockedFields = ['provider', 'route', 'transforms', 'models', 'api_key', 'apiKey'];
+    const blockedFields = [
+        'provider',
+        'route',
+        'transforms',
+        'models',
+        'api_key',
+        'apiKey',
+        'tool_choice',
+        'tools',
+        'response_format',
+        'plugins',
+        'modalities',
+    ];
     for (const field of blockedFields) {
         if (field in body) {
             return { ok: false, status: 400, error: `Field not allowed: ${field}` };
@@ -82,7 +94,7 @@ function validateChatRequest(body) {
     return {
         ok: true,
         payload: {
-            model: resolveModel(body.model),
+            model: getProductionModel(),
             messages: body.messages,
             stream: body.stream !== false,
             temperature: clampTemperature(body.temperature),
