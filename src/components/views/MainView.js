@@ -1,4 +1,5 @@
 import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
+import { getPickerProfiles, getSessionProfile, normalizeProfileId } from '../../config/sessionProfiles.js';
 
 const FLASH_VISION_MODEL = 'Gemini 3.6 Flash';
 const OPENROUTER_MODEL_LABELS = {
@@ -180,7 +181,7 @@ export class MainView extends LitElement {
             padding: 14px;
             border: 1px solid var(--border);
             border-radius: var(--radius-md);
-            background: linear-gradient(180deg, rgba(196, 30, 58, 0.08) 0%, var(--bg-surface) 42%);
+            background: var(--bg-surface);
         }
 
         .flash-panel-header {
@@ -277,7 +278,96 @@ export class MainView extends LitElement {
             padding: 14px;
             border: 1px solid rgba(90, 171, 110, 0.35);
             border-radius: var(--radius-md);
-            background: linear-gradient(180deg, rgba(90, 171, 110, 0.12) 0%, rgba(90, 171, 110, 0.04) 100%);
+            background: var(--bg-surface);
+        }
+
+        .profile-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .profile-row {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 2px;
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            background: var(--bg-elevated);
+            text-align: left;
+            cursor: pointer;
+            transition:
+                border-color var(--transition),
+                background var(--transition);
+        }
+
+        .profile-row:hover {
+            border-color: var(--border-strong);
+            background: var(--bg-hover);
+        }
+
+        .profile-row.selected {
+            border-color: var(--accent);
+            background: var(--bg-surface);
+        }
+
+        .profile-row-label {
+            font-size: var(--font-size-sm);
+            font-weight: var(--font-weight-semibold);
+            color: var(--text-primary);
+        }
+
+        .profile-row-desc {
+            font-size: var(--font-size-xs);
+            color: var(--text-muted);
+            line-height: var(--line-height);
+        }
+
+        .context-area {
+            min-height: 96px;
+        }
+
+        .readiness-strip {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 8px;
+        }
+
+        .readiness-cell {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            padding: 8px 10px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            background: var(--bg-surface);
+        }
+
+        .readiness-name {
+            font-size: 10px;
+            font-weight: var(--font-weight-semibold);
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+        }
+
+        .readiness-value {
+            font-size: var(--font-size-xs);
+            color: var(--text-secondary);
+        }
+
+        .readiness-value.ready {
+            color: var(--success);
+        }
+
+        .readiness-value.pending,
+        .readiness-value.needs-keys,
+        .readiness-value.needs-license,
+        .readiness-value.denied {
+            color: var(--warning);
         }
 
         .included-banner-icon {
@@ -892,13 +982,15 @@ export class MainView extends LitElement {
         _whisperModel: { state: true },
         _answerModel: { state: true },
         _showLocalHelp: { state: true },
+        _profileContext: { state: true },
+        _readiness: { state: true },
     };
 
     constructor() {
         super();
         this.onStart = () => {};
         this.onExternalLink = () => {};
-        this.selectedProfile = 'interview';
+        this.selectedProfile = 'sales';
         this.onProfileChange = () => {};
         this.isInitializing = false;
         this.whisperDownloading = false;
@@ -918,6 +1010,8 @@ export class MainView extends LitElement {
         this._showLocalHelp = false;
         this._whisperModel = 'base.en';
         this._answerModel = 'google/gemini-3.5-flash-lite';
+        this._profileContext = '';
+        this._readiness = null;
 
         this._animId = null;
         this._time = 0;
@@ -948,6 +1042,7 @@ export class MainView extends LitElement {
             this._openaiKey = creds.openaiKey || '';
             this._whisperModel = prefs.whisperModel || 'base.en';
             this._answerModel = config.openrouterModel || 'google/gemini-3.5-flash-lite';
+            this._profileContext = await cheatingDaddy.storage.getProfileContext(this.selectedProfile);
 
             this.requestUpdate();
         } catch (e) {
@@ -955,9 +1050,25 @@ export class MainView extends LitElement {
         }
     }
 
+    async _refreshReadiness() {
+        if (!window.menaceElectron) {
+            return;
+        }
+        try {
+            const result = await window.menaceElectron.invoke('app:get-session-readiness');
+            if (result?.success) {
+                this._readiness = result.data;
+                this.requestUpdate();
+            }
+        } catch (error) {
+            console.warn('Could not load session readiness:', error);
+        }
+    }
+
     connectedCallback() {
         super.connectedCallback();
         document.addEventListener('keydown', this.boundKeydownHandler);
+        this._refreshReadiness();
     }
 
     disconnectedCallback() {
@@ -974,6 +1085,15 @@ export class MainView extends LitElement {
                 cancelAnimationFrame(this._animId);
                 this._animId = null;
             }
+        }
+        if (changedProperties.has('selectedProfile')) {
+            cheatingDaddy.storage.getProfileContext(this.selectedProfile).then(context => {
+                this._profileContext = context;
+                this.requestUpdate();
+            });
+        }
+        if (changedProperties.has('licenseValid') || changedProperties.has('hostedAi')) {
+            this._refreshReadiness();
         }
     }
 
@@ -1043,8 +1163,21 @@ export class MainView extends LitElement {
         this.requestUpdate();
     }
 
-    _handleProfileChange(e) {
-        this.onProfileChange(e.target.value);
+    async _selectProfile(profileId) {
+        const nextProfile = normalizeProfileId(profileId);
+        if (nextProfile === this.selectedProfile) {
+            return;
+        }
+
+        await cheatingDaddy.storage.setProfileContext(this.selectedProfile, this._profileContext);
+        this.onProfileChange(nextProfile);
+        this._profileContext = await cheatingDaddy.storage.getProfileContext(nextProfile);
+        this.requestUpdate();
+    }
+
+    async _saveProfileContext(value) {
+        this._profileContext = value;
+        await cheatingDaddy.storage.setProfileContext(this.selectedProfile, value);
     }
 
     _openLocalHelp() {
@@ -1159,7 +1292,15 @@ export class MainView extends LitElement {
         </svg>`;
 
         const startBlocked = this.licenseValid && (this.isInitializing || isDownloading);
-        const startLabel = !this.licenseValid ? 'Unlock to start' : isDownloading ? (hasPercentage ? `${percentage}%` : 'Preparing...') : 'Start';
+        const profile = getSessionProfile(this.selectedProfile);
+        const sessionStartLabel = profile.startLabel;
+        const startLabel = !this.licenseValid
+            ? 'Unlock to start'
+            : isDownloading
+              ? hasPercentage
+                  ? `${percentage}%`
+                  : 'Preparing...'
+              : sessionStartLabel;
 
         return html`
             <div
@@ -1222,7 +1363,7 @@ export class MainView extends LitElement {
                 <div class="flash-panel-header">
                     <div>
                         <div class="flash-panel-title">Latest Flash models</div>
-                        <div class="flash-panel-subtitle">Fast Google Flash models, picked for live interview answers.</div>
+                        <div class="flash-panel-subtitle">Fast Google Flash models, picked for fast live responses.</div>
                     </div>
                     <span class="flash-panel-badge">${badge}</span>
                 </div>
@@ -1340,7 +1481,7 @@ export class MainView extends LitElement {
                 />
                 <div class="form-hint">
                     <span class="link" @click=${() => this.onExternalLink('https://openrouter.ai/keys')}>Get an OpenRouter key</span>
-                    for live interview answers.
+                    for live responses.
                 </div>
             </div>
         `;
@@ -1445,38 +1586,118 @@ export class MainView extends LitElement {
 
     // ── Whisper + OpenRouter mode ──
 
-    _renderWhisperOpenRouterMode() {
+    _renderProfileSelector() {
+        const profiles = getPickerProfiles();
+        return html`
+            <div class="profile-list" role="listbox" aria-label="Session type">
+                ${profiles.map(
+                    profile => html`
+                        <button
+                            type="button"
+                            class="profile-row ${this.selectedProfile === profile.id ? 'selected' : ''}"
+                            role="option"
+                            aria-selected=${this.selectedProfile === profile.id}
+                            @click=${() => this._selectProfile(profile.id)}
+                        >
+                            <span class="profile-row-label">${profile.label}</span>
+                            <span class="profile-row-desc">${profile.description}</span>
+                        </button>
+                    `
+                )}
+            </div>
+        `;
+    }
+
+    _renderContextField() {
+        const profile = getSessionProfile(this.selectedProfile);
+        return html`
+            <div class="form-group">
+                <label class="form-label">${profile.contextLabel}</label>
+                <textarea
+                    class="context-area"
+                    placeholder=${profile.contextPlaceholder}
+                    .value=${this._profileContext}
+                    @input=${e => this._saveProfileContext(e.target.value)}
+                ></textarea>
+            </div>
+        `;
+    }
+
+    _renderReadinessStrip() {
+        if (!this._readiness) {
+            return '';
+        }
+
+        const cells = [
+            { name: 'Audio', value: this._readiness.audio },
+            { name: 'Screen', value: this._readiness.screen },
+            { name: 'AI', value: this._readiness.ai },
+        ];
+
+        return html`
+            <div class="readiness-strip" aria-label="Session readiness">
+                ${cells.map(
+                    cell => html`
+                        <div class="readiness-cell">
+                            <span class="readiness-name">${cell.name}</span>
+                            <span class="readiness-value ${cell.value?.state || ''}">${cell.value?.label || '—'}</span>
+                        </div>
+                    `
+                )}
+            </div>
+        `;
+    }
+
+    _renderAdvancedSection() {
         const flashFootnote = this.hostedAi
             ? 'Your pass covers these models. We keep them updated automatically.'
             : 'Flash models are picked for you. Your API keys cover usage on Gemini and OpenRouter.';
 
         return html`
-            ${this._renderAiAccessSection()}
-            ${this._renderFlashModelsPanel({
-                badge: this.hostedAi ? 'Included' : this.licenseValid ? 'Your keys' : 'Preview',
-                footnote: flashFootnote,
-            })}
-
-            <div class="form-group">
-                <div class="whisper-label-row">
-                    <label class="form-label">Speech recognition</label>
-                    ${this.whisperDownloading ? html`<div class="whisper-spinner"></div>` : ''}
+            <details class="config-section" @toggle=${this._handleConfigToggle}>
+                <summary class="config-summary">
+                    <span class="config-summary-text">
+                        <span class="config-summary-title">AI & transcription</span>
+                        <span class="config-summary-description">Models, keys, and local Whisper</span>
+                    </span>
+                    ${this._renderConfigChevron()}
+                </summary>
+                <div class="config-content">
+                    ${this._renderAiAccessSection()}
+                    ${this._renderFlashModelsPanel({
+                        badge: this.hostedAi ? 'Included' : this.licenseValid ? 'Your keys' : 'Preview',
+                        footnote: flashFootnote,
+                    })}
+                    <div class="form-group">
+                        <div class="whisper-label-row">
+                            <label class="form-label">Speech recognition</label>
+                            ${this.whisperDownloading ? html`<div class="whisper-spinner"></div>` : ''}
+                        </div>
+                        <select .value=${this._whisperModel} @change=${e => this._saveWhisperModel(e.target.value)}>
+                            <option value="tiny.en" ?selected=${this._whisperModel === 'tiny.en'}>Tiny — fastest (75 MB)</option>
+                            <option value="base.en" ?selected=${this._whisperModel === 'base.en'}>Base — recommended (142 MB)</option>
+                            <option value="small.en" ?selected=${this._whisperModel === 'small.en'}>Small — most accurate (466 MB)</option>
+                        </select>
+                        <div class="form-hint">
+                            ${
+                                this.whisperDownloading
+                                    ? 'Downloading Whisper model...'
+                                    : 'Runs locally on your Mac. Downloads once on first start.'
+                            }
+                        </div>
+                    </div>
                 </div>
-                <select .value=${this._whisperModel} @change=${e => this._saveWhisperModel(e.target.value)}>
-                    <option value="tiny.en" ?selected=${this._whisperModel === 'tiny.en'}>Tiny — fastest (75 MB)</option>
-                    <option value="base.en" ?selected=${this._whisperModel === 'base.en'}>Base — recommended (142 MB)</option>
-                    <option value="small.en" ?selected=${this._whisperModel === 'small.en'}>Small — most accurate (466 MB)</option>
-                </select>
-                <div class="form-hint">
-                    ${
-                        this.whisperDownloading
-                            ? 'Downloading Whisper model...'
-                            : 'Runs locally on your Mac. Downloads once on first start.'
-                    }
-                </div>
-            </div>
+            </details>
+        `;
+    }
 
+    _renderWhisperOpenRouterMode() {
+        return html`
+            ${this._renderProfileSelector()}
+            ${this._renderContextField()}
+            ${this._renderReadinessStrip()}
             ${this._renderStartButton()}
+            ${this._renderAdvancedSection()}
         `;
     }
 
@@ -1524,17 +1745,17 @@ export class MainView extends LitElement {
     // ── Main render ──
 
     render() {
-        const modeSubtitle = !this.licenseValid
-            ? 'Choose a pass to unlock the app. Full passes include AI; BYOK is $15/mo with your own keys.'
+        const licenseHint = !this.licenseValid
+            ? 'A pass is required to start. Full passes include AI; BYOK uses your own keys.'
             : this.hostedAi
-              ? 'Pass active. Press Start when you are ready.'
-              : 'Pass active. Add your Gemini and OpenRouter keys, then press Start.';
+              ? 'Your pass includes AI. Add context above, then start your session.'
+              : 'Add your API keys under AI & transcription if needed, then start.';
 
         return html`
             <div class="form-scroll">
                 <div class="form-wrapper">
-                    <div class="page-title">Menace Agent</div>
-                    <div class="page-subtitle">${modeSubtitle}</div>
+                    <div class="page-title">What are you doing?</div>
+                    <div class="page-subtitle">Know what to say next. ${licenseHint}</div>
                     ${this._renderWhisperOpenRouterMode()}
                 </div>
             </div>

@@ -1,20 +1,23 @@
 # Menace Agent
 
-A live interview autocue for macOS. It listens with local Whisper, answers through your OpenRouter key, and collapses into a compact always-on-top prompter once a session starts.
+**Know what to say next.**
+
+Menace listens to the conversation, understands what's on screen, and gives you concise, ready-to-speak responses in real time. Built for sales calls, meetings, interviews, negotiations, presentations, and custom workflows.
 
 > [!NOTE]
 > Use the latest macOS. Older versions have limited system-audio support.
 
 > [!NOTE]
-> During testing it will not answer if you ask something yourself. Simulate an interviewer asking a question — that is what it answers.
+> During testing it will not answer if you ask something yourself. Simulate another participant asking a question — that is what it answers.
 
 ## Features
 
 - **Included AI + local Whisper**: paid users get hosted answers; on-device transcription
 - **Screen & audio capture**: contextual help from what you see and hear
-- **Profiles**: Interview (default), Sales Call, Business Meeting, Presentation, Negotiation
-- **Talent autocue overlay**: compact always-on-top window with click-through
-- **First-run setup**: activate your pass, grant macOS permissions, optional resume context
+- **Session profiles**: Sales Call (default), Meeting, Interview, Negotiation, Presentation, Custom
+- **Per-profile context**: keep sales battlecards separate from interview prep
+- **Conversation autocue overlay**: compact always-on-top window with click-through
+- **First-run setup**: activate your pass, grant macOS permissions, optional session context
 
 ## Setup (development)
 
@@ -69,10 +72,10 @@ Artifacts land in `out/`.
 ## Usage
 
 1. Complete onboarding (activate pass + permissions)
-2. Confirm Whisper model on Home (default: Base English)
-3. Click **Start Session**
+2. On Home, choose a session type and add context
+3. Click **Start Sales Call** (or your selected session type)
 4. Position the compact overlay with keyboard shortcuts
-5. Speak from the ready-to-say lines while the interviewer talks
+5. Speak from the ready-to-say lines while the conversation continues
 
 ## Keyboard Shortcuts
 
@@ -87,7 +90,7 @@ Artifacts land in `out/`.
 - **Windows**: Loopback audio capture
 - **Linux**: Microphone input
 
-On **macOS 26+**, interviewer audio needs **System Settings → Privacy & Security → Screen & System Audio Recording**. When running with `npm start`, enable **Electron** (not only the packaged Menace Agent app). If capture stays silent, also check **System Audio Recording Only**.
+On **macOS 26+**, other participants' audio needs **System Settings → Privacy & Security → Screen & System Audio Recording**. When running with `npm start`, enable **Electron** (not only the packaged Menace Agent app). If capture stays silent, also check **System Audio Recording Only**.
 
 ## Requirements
 

@@ -1,6 +1,6 @@
 ---
 name: Menace Agent
-description: Talent autocue — matte black hood, cream type, red tally, hairline bezels.
+description: Conversation autocue — matte black hood, cream type, red tally, hairline bezels.
 colors:
   hood: "#0b0b0b"
   surface: "#121212"
@@ -144,9 +144,9 @@ components:
 
 ## Overview
 
-**Creative North Star: "Talent Autocue"**
+**Creative North Star: "Conversation Autocue"**
 
-Menace Agent is a newsroom teleprompter in a Mac window: a matte black hood, cream-white copy, and a single red camera tally. Setup is a centered board of hairline plates (KEY, WHISPER, permissions). Once the session starts, the app collapses into a compact always-on-top strip whose job is ready-to-speak lines — not a copilot dashboard.
+Menace Agent is a newsroom teleprompter in a Mac window: a matte black hood, cream-white copy, and a single red camera tally. Setup is a centered board of hairline plates (session type, context, permissions). Once the session starts, the app collapses into a compact always-on-top strip whose job is ready-to-speak lines — not a copilot dashboard.
 
 The material is opaque metal and matte plastic, not glass. Edges are cream at 8–14% opacity — a bezel that catches light, not a drawn box. Type is the Mac’s own sans, set like a prompter: one large instruction on the hood, then 20px medium lines you can read aloud while the call stays in front. Personality stays dry and on-air, not corporate and not neon-AI.
 
@@ -199,7 +199,7 @@ A four-ink board: hood, cream, hairline bezel, red tally. Status greens and ambe
 - **Mono** (400, 11px): Keycaps, response counters, live elapsed time.
 
 ### Named Rules
-**The Prompter Face Rule.** One system sans for everything a candidate reads. Do not introduce a display serif, a geometric AI sans, or a second UI family. Mono is for machine text only.
+**The Prompter Face Rule.** One system sans for everything the user reads aloud. Do not introduce a display serif, a geometric AI sans, or a second UI family. Mono is for machine text only.
 
 **The Ready-to-Speak Rule.** Live answers are 20px medium cream on hood. Do not drop session copy to body size to “fit more dashboard.”
 

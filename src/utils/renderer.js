@@ -1,5 +1,25 @@
-// renderer.js
-const { ipcRenderer } = require('electron');
+// renderer.js — uses the contextBridge API from preload.js (no Node integration in renderer).
+
+function getElectronBridge() {
+    if (!window.menaceElectron) {
+        throw new Error('Menace Electron bridge is not available');
+    }
+    return window.menaceElectron;
+}
+
+const ipcRenderer = {
+    invoke(channel, ...args) {
+        return getElectronBridge().invoke(channel, ...args);
+    },
+    send(channel, ...args) {
+        getElectronBridge().send(channel, ...args);
+    },
+    on(channel, listener) {
+        return getElectronBridge().on(channel, (...payload) => {
+            listener(null, ...payload);
+        });
+    },
+};
 
 let mediaStream = null;
 let screenshotInterval = null;
@@ -16,8 +36,8 @@ let offscreenCanvas = null;
 let offscreenContext = null;
 let currentImageQuality = 'medium'; // Store current image quality for manual screenshots
 
-const isLinux = process.platform === 'linux';
-const isMacOS = process.platform === 'darwin';
+const isLinux = window.menaceElectron?.platform === 'linux';
+const isMacOS = window.menaceElectron?.platform === 'darwin';
 
 // ============ STORAGE API ============
 // Wrapper for IPC-based storage access
@@ -67,6 +87,13 @@ const storage = {
     },
     async updatePreference(key, value) {
         return ipcRenderer.invoke('storage:update-preference', key, value);
+    },
+    async getProfileContext(profileId) {
+        const result = await ipcRenderer.invoke('storage:get-profile-context', profileId);
+        return result.success ? result.data : '';
+    },
+    async setProfileContext(profileId, context) {
+        return ipcRenderer.invoke('storage:set-profile-context', profileId, context);
     },
 
     // Keybinds
@@ -167,11 +194,15 @@ function arrayBufferToBase64(buffer) {
     return btoa(binary);
 }
 
-async function initializeGemini(profile = 'interview', language = 'en-US') {
+async function getSessionContext(profile) {
+    return storage.getProfileContext(profile);
+}
+
+async function initializeGemini(profile = 'sales', language = 'en-US') {
     const apiKey = await storage.getApiKey();
     if (apiKey) {
-        const prefs = await storage.getPreferences();
-        const success = await ipcRenderer.invoke('initialize-gemini', apiKey, prefs.customPrompt || '', profile, language);
+        const customPrompt = await getSessionContext(profile);
+        const success = await ipcRenderer.invoke('initialize-gemini', apiKey, customPrompt, profile, language);
         if (success) {
             cheatingDaddy.setStatus('Live');
         } else {
@@ -180,11 +211,11 @@ async function initializeGemini(profile = 'interview', language = 'en-US') {
     }
 }
 
-async function initializeLocal(profile = 'interview') {
+async function initializeLocal(profile = 'sales') {
     const prefs = await storage.getPreferences();
     const localLlmModel = prefs.localLlmModel || 'unsloth/Qwen3.5-4B-GGUF:Q4_K_M';
     const whisperModel = prefs.whisperModel || 'base.en';
-    const customPrompt = prefs.customPrompt || '';
+    const customPrompt = await getSessionContext(profile);
 
     const success = await ipcRenderer.invoke('initialize-local', localLlmModel, whisperModel, profile, customPrompt);
     if (success) {
@@ -196,10 +227,10 @@ async function initializeLocal(profile = 'interview') {
     }
 }
 
-async function initializeWhisperOpenRouter(profile = 'interview') {
+async function initializeWhisperOpenRouter(profile = 'sales') {
     const prefs = await storage.getPreferences();
     const whisperModel = prefs.whisperModel || 'base.en';
-    const customPrompt = prefs.customPrompt || '';
+    const customPrompt = await getSessionContext(profile);
 
     const success = await ipcRenderer.invoke('initialize-whisper-openrouter', whisperModel, profile, customPrompt);
     if (success) {
@@ -215,7 +246,7 @@ async function cancelLocalInitialization() {
     return ipcRenderer.invoke('cancel-local-initialization');
 }
 
-async function initializeCloud(profile = 'interview') {
+async function initializeCloud(profile = 'sales') {
     const creds = await storage.getCredentials();
     const token = creds.cloudToken;
     if (!token || !token.trim()) {
@@ -223,8 +254,8 @@ async function initializeCloud(profile = 'interview') {
         return false;
     }
 
-    const prefs = await storage.getPreferences();
-    const success = await ipcRenderer.invoke('initialize-cloud', token, profile, prefs.customPrompt || '');
+    const customPrompt = await getSessionContext(profile);
+    const success = await ipcRenderer.invoke('initialize-cloud', token, profile, customPrompt);
     if (success) {
         cheatingDaddy.setStatus('Live');
         return true;
@@ -826,6 +857,10 @@ function handleShortcut(shortcutKey) {
         }
     }
 }
+
+getElectronBridge().on('handle-shortcut', shortcutKey => {
+    handleShortcut(shortcutKey);
+});
 
 // Create reference to the main app element
 const cheatingDaddyApp = document.querySelector('cheating-daddy-app');

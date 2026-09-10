@@ -164,37 +164,28 @@ export class AppHeader extends LitElement {
 
     async _checkForUpdates() {
         try {
-            const currentVersion = await cheatingDaddy.getVersion();
-            const response = await fetch('https://raw.githubusercontent.com/sohzm/cheating-daddy/refs/heads/master/package.json');
-            if (!response.ok) return;
-
-            const remotePackage = await response.json();
-            const remoteVersion = remotePackage.version;
-
-            if (this._isNewerVersion(remoteVersion, currentVersion)) {
-                this.updateAvailable = true;
+            if (!window.menaceElectron) {
+                return;
             }
+
+            const result = await window.menaceElectron.invoke('app:check-updates');
+            if (!result?.success || !result.data) {
+                return;
+            }
+
+            this.updateAvailable = Boolean(result.data.updateAvailable && result.data.releasePageUrl);
+            this.requestUpdate();
         } catch (err) {
             console.log('Update check failed:', err.message);
         }
     }
 
-    _isNewerVersion(remote, current) {
-        const remoteParts = remote.split('.').map(Number);
-        const currentParts = current.split('.').map(Number);
-
-        for (let i = 0; i < Math.max(remoteParts.length, currentParts.length); i++) {
-            const r = remoteParts[i] || 0;
-            const c = currentParts[i] || 0;
-            if (r > c) return true;
-            if (r < c) return false;
-        }
-        return false;
-    }
-
     async _openUpdatePage() {
-        const { ipcRenderer } = require('electron');
-        await ipcRenderer.invoke('open-external', 'https://openrouter.ai/keys');
+        if (!window.menaceElectron) {
+            return;
+        }
+
+        await window.menaceElectron.invoke('app:open-update');
     }
 
     disconnectedCallback() {

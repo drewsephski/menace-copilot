@@ -8,6 +8,7 @@ import { OnboardingView } from '../views/OnboardingView.js';
 import { AICustomizeView } from '../views/AICustomizeView.js';
 import { FeedbackView } from '../views/FeedbackView.js';
 import { UnlockView } from '../views/UnlockView.js';
+import { DEFAULT_SESSION_PROFILE_ID, getProfileShortLabel, normalizeProfileId } from '../../config/sessionProfiles.js';
 
 export class CheatingDaddyApp extends LitElement {
     static styles = css`
@@ -425,7 +426,7 @@ export class CheatingDaddyApp extends LitElement {
         this.startTime = null;
         this.isRecording = false;
         this.sessionActive = false;
-        this.selectedProfile = 'interview';
+        this.selectedProfile = DEFAULT_SESSION_PROFILE_ID;
         this.selectedLanguage = 'en-US';
         this.selectedScreenshotInterval = '5';
         this.selectedImageQuality = 'medium';
@@ -451,22 +452,19 @@ export class CheatingDaddyApp extends LitElement {
 
     async _checkForUpdates() {
         try {
-            this._localVersion = await cheatingDaddy.getVersion();
-            this.requestUpdate();
-
-            const res = await fetch('https://raw.githubusercontent.com/sohzm/cheating-daddy/refs/heads/master/package.json');
-            if (!res.ok) return;
-            const remote = await res.json();
-            const remoteVersion = remote.version;
-
-            const toNum = v => v.split('.').map(Number);
-            const [rMaj, rMin, rPatch] = toNum(remoteVersion);
-            const [lMaj, lMin, lPatch] = toNum(this._localVersion);
-
-            if (rMaj > lMaj || (rMaj === lMaj && rMin > lMin) || (rMaj === lMaj && rMin === lMin && rPatch > lPatch)) {
-                this._updateAvailable = true;
-                this.requestUpdate();
+            if (!window.menaceElectron) {
+                this._localVersion = await cheatingDaddy.getVersion();
+                return;
             }
+
+            const result = await window.menaceElectron.invoke('app:check-updates');
+            if (!result?.success || !result.data) {
+                return;
+            }
+
+            this._localVersion = result.data.localVersion || await cheatingDaddy.getVersion();
+            this._updateAvailable = Boolean(result.data.updateAvailable && result.data.releasePageUrl);
+            this.requestUpdate();
         } catch (e) {
             // silently ignore
         }
@@ -488,7 +486,7 @@ export class CheatingDaddyApp extends LitElement {
                 this.currentView = 'main';
             }
 
-            this.selectedProfile = prefs.selectedProfile || 'interview';
+            this.selectedProfile = normalizeProfileId(prefs.selectedProfile || DEFAULT_SESSION_PROFILE_ID);
             this.selectedLanguage = prefs.selectedLanguage || 'en-US';
             this.selectedScreenshotInterval = prefs.selectedScreenshotInterval || '5';
             this.selectedImageQuality = prefs.selectedImageQuality || 'medium';
@@ -507,19 +505,19 @@ export class CheatingDaddyApp extends LitElement {
     connectedCallback() {
         super.connectedCallback();
 
-        if (window.require) {
-            const { ipcRenderer } = window.require('electron');
-            ipcRenderer.on('new-response', (_, response) => this.addNewResponse(response));
-            ipcRenderer.on('update-response', (_, response) => this.updateCurrentResponse(response));
-            ipcRenderer.on('update-status', (_, status) => this.setStatus(status));
-            ipcRenderer.on('click-through-toggled', (_, isEnabled) => {
+        if (window.menaceElectron) {
+            const { on } = window.menaceElectron;
+            on('new-response', response => this.addNewResponse(response));
+            on('update-response', response => this.updateCurrentResponse(response));
+            on('update-status', status => this.setStatus(status));
+            on('click-through-toggled', isEnabled => {
                 this._isClickThrough = isEnabled;
             });
-            ipcRenderer.on('reconnect-failed', (_, data) => this.addNewResponse(data.message));
-            ipcRenderer.on('whisper-downloading', (_, downloading) => {
+            on('reconnect-failed', data => this.addNewResponse(data.message));
+            on('whisper-downloading', downloading => {
                 this._whisperDownloading = downloading;
             });
-            ipcRenderer.on('local-ai-download-progress', (_, progress) => {
+            on('local-ai-download-progress', progress => {
                 this._localAiDownloadProgress = progress;
             });
         }
@@ -528,15 +526,15 @@ export class CheatingDaddyApp extends LitElement {
     disconnectedCallback() {
         super.disconnectedCallback();
         this._stopTimer();
-        if (window.require) {
-            const { ipcRenderer } = window.require('electron');
-            ipcRenderer.removeAllListeners('new-response');
-            ipcRenderer.removeAllListeners('update-response');
-            ipcRenderer.removeAllListeners('update-status');
-            ipcRenderer.removeAllListeners('click-through-toggled');
-            ipcRenderer.removeAllListeners('reconnect-failed');
-            ipcRenderer.removeAllListeners('whisper-downloading');
-            ipcRenderer.removeAllListeners('local-ai-download-progress');
+        if (window.menaceElectron) {
+            const { removeAllListeners } = window.menaceElectron;
+            removeAllListeners('new-response');
+            removeAllListeners('update-response');
+            removeAllListeners('update-status');
+            removeAllListeners('click-through-toggled');
+            removeAllListeners('reconnect-failed');
+            removeAllListeners('whisper-downloading');
+            removeAllListeners('local-ai-download-progress');
         }
     }
 
@@ -620,32 +618,28 @@ export class CheatingDaddyApp extends LitElement {
     async handleClose() {
         if (this.currentView === 'assistant') {
             cheatingDaddy.stopCapture();
-            if (window.require) {
-                const { ipcRenderer } = window.require('electron');
-                await ipcRenderer.invoke('close-session');
+            if (window.menaceElectron) {
+                await window.menaceElectron.invoke('close-session');
             }
             this.sessionActive = false;
             this._stopTimer();
             this.currentView = 'main';
         } else {
-            if (window.require) {
-                const { ipcRenderer } = window.require('electron');
-                await ipcRenderer.invoke('quit-application');
+            if (window.menaceElectron) {
+                await window.menaceElectron.invoke('quit-application');
             }
         }
     }
 
     async _handleMinimize() {
-        if (window.require) {
-            const { ipcRenderer } = window.require('electron');
-            await ipcRenderer.invoke('window-minimize');
+        if (window.menaceElectron) {
+            await window.menaceElectron.invoke('window-minimize');
         }
     }
 
     async handleHideToggle() {
-        if (window.require) {
-            const { ipcRenderer } = window.require('electron');
-            await ipcRenderer.invoke('toggle-window-visibility');
+        if (window.menaceElectron) {
+            await window.menaceElectron.invoke('toggle-window-visibility');
         }
     }
 
@@ -658,6 +652,11 @@ export class CheatingDaddyApp extends LitElement {
             this.currentView = 'license';
             this.requestUpdate();
             return;
+        }
+
+        const mainView = this.shadowRoot.querySelector('main-view');
+        if (mainView && typeof mainView._profileContext === 'string') {
+            await cheatingDaddy.storage.setProfileContext(this.selectedProfile, mainView._profileContext);
         }
 
         const prefs = await cheatingDaddy.storage.getPreferences();
@@ -739,17 +738,17 @@ export class CheatingDaddyApp extends LitElement {
     }
 
     async handleAPIKeyHelp() {
-        if (window.require) {
-            const { ipcRenderer } = window.require('electron');
-            await ipcRenderer.invoke('open-external', 'https://openrouter.ai/keys');
+        if (window.menaceElectron) {
+            await window.menaceElectron.invoke('open-external', 'https://openrouter.ai/keys');
         }
     }
 
     // ── Settings handlers ──
 
     async handleProfileChange(profile) {
-        this.selectedProfile = profile;
-        await cheatingDaddy.storage.updatePreference('selectedProfile', profile);
+        const normalized = normalizeProfileId(profile);
+        this.selectedProfile = normalized;
+        await cheatingDaddy.storage.updatePreference('selectedProfile', normalized);
     }
 
     async handleLanguageChange(language) {
@@ -774,10 +773,17 @@ export class CheatingDaddyApp extends LitElement {
     }
 
     async handleExternalLinkClick(url) {
-        if (window.require) {
-            const { ipcRenderer } = window.require('electron');
-            await ipcRenderer.invoke('open-external', url);
+        if (window.menaceElectron) {
+            await window.menaceElectron.invoke('open-external', url);
         }
+    }
+
+    async _openUpdate() {
+        if (!window.menaceElectron) {
+            return;
+        }
+
+        await window.menaceElectron.invoke('app:open-update');
     }
 
     async handleSendText(message) {
@@ -797,9 +803,8 @@ export class CheatingDaddyApp extends LitElement {
     }
 
     async handleOnboardingComplete() {
-        if (window.require) {
-            const { ipcRenderer } = window.require('electron');
-            await ipcRenderer.invoke('refresh-display-media-handler');
+        if (window.menaceElectron) {
+            await window.menaceElectron.invoke('refresh-display-media-handler');
         }
 
         const license = await cheatingDaddy.license.getStatus();
@@ -811,9 +816,8 @@ export class CheatingDaddyApp extends LitElement {
     updated(changedProperties) {
         super.updated(changedProperties);
 
-        if (changedProperties.has('currentView') && window.require) {
-            const { ipcRenderer } = window.require('electron');
-            ipcRenderer.send('view-changed', this.currentView);
+        if (changedProperties.has('currentView') && window.menaceElectron) {
+            window.menaceElectron.send('view-changed', this.currentView);
         }
     }
 
@@ -936,7 +940,7 @@ export class CheatingDaddyApp extends LitElement {
             },
             {
                 id: 'ai-customize',
-                label: 'AI Customization',
+                label: 'Session Context',
                 icon: html`<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24">
                     <path
                         fill="none"
@@ -1016,7 +1020,7 @@ export class CheatingDaddyApp extends LitElement {
                     ${
                         this._updateAvailable
                             ? html`
-                                  <button class="update-btn" @click=${() => this.handleExternalLinkClick('https://openrouter.ai')}>
+                                  <button class="update-btn" @click=${() => this._openUpdate()}>
                                       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                                           <path
                                               fill="none"
@@ -1040,15 +1044,6 @@ export class CheatingDaddyApp extends LitElement {
     renderLiveBar() {
         if (!this._isLiveMode()) return '';
 
-        const profileLabels = {
-            interview: 'Interview',
-            sales: 'Sales Call',
-            meeting: 'Meeting',
-            presentation: 'Presentation',
-            negotiation: 'Negotiation',
-            exam: 'Exam',
-        };
-
         return html`
             <div class="live-bar">
                 <div class="live-bar-left">
@@ -1064,7 +1059,7 @@ export class CheatingDaddyApp extends LitElement {
                 </div>
                 <div class="live-bar-center">
                     <span class="on-air"
-                        ><span class="on-air-dot" aria-hidden="true"></span>Live · ${profileLabels[this.selectedProfile] || 'Session'}</span
+                        ><span class="on-air-dot" aria-hidden="true"></span>Live · ${getProfileShortLabel(this.selectedProfile)}</span
                     >
                 </div>
                 <div class="live-bar-right">

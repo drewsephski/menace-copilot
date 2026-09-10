@@ -6,8 +6,7 @@ const { spawn } = require('child_process');
 const { Readable, Transform } = require('stream');
 const { pipeline } = require('stream/promises');
 const { getConfigDir } = require('../storage');
-
-const RELEASE_BASE_URL = 'https://github.com/sohzm/cheating-daddy/releases/download/v0.7.0';
+const { getLocalAiBinariesBaseUrl } = require('../config/releaseSource');
 
 const BINARY_RELEASES = {
     darwin: {
@@ -160,8 +159,23 @@ async function ensureNativeBinary(type, onProgress, signal) {
     const release = getPlatformReleases()[type];
     const destinationPath = path.join(getBinariesDirectory(), release.filename);
 
+    if (await fileMatchesChecksum(destinationPath, release.sha256)) {
+        if (process.platform !== 'win32') {
+            fs.chmodSync(destinationPath, 0o755);
+        }
+        return destinationPath;
+    }
+
+    const baseUrl = getLocalAiBinariesBaseUrl();
+    if (!baseUrl) {
+        throw new Error(
+            `Local AI binary ${release.filename} is not installed and no Menace release source is configured. ` +
+                'Set MENACE_LOCAL_AI_BINARIES_BASE_URL or install binaries manually.'
+        );
+    }
+
     return installVerifiedFile({
-        url: `${RELEASE_BASE_URL}/${release.filename}`,
+        url: `${baseUrl}/${release.filename}`,
         destinationPath,
         sha256: release.sha256,
         executable: true,

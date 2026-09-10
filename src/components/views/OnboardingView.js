@@ -1,6 +1,7 @@
 import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
 import '../ui/premiumPlanPicker.js';
 import '../ui/premiumLicenseInput.js';
+import { DEFAULT_SESSION_PROFILE_ID, getPickerProfiles, getSessionProfile } from '../../config/sessionProfiles.js';
 
 export class OnboardingView extends LitElement {
     static styles = css`
@@ -266,6 +267,42 @@ export class OnboardingView extends LitElement {
             color: var(--text-muted);
         }
 
+        .profile-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .profile-row {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            background: var(--bg-elevated);
+            text-align: left;
+            cursor: pointer;
+        }
+
+        .profile-row.selected {
+            border-color: var(--accent);
+            background: var(--bg-surface);
+        }
+
+        .profile-row-label {
+            font-size: var(--font-size-sm);
+            font-weight: var(--font-weight-semibold);
+            color: var(--text-primary);
+        }
+
+        .profile-row-desc {
+            font-size: var(--font-size-xs);
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+
         .activate-row {
             display: flex;
             gap: 8px;
@@ -414,6 +451,7 @@ export class OnboardingView extends LitElement {
         checkoutBusy: { type: Boolean },
         checkoutError: { type: String },
         selectedSku: { type: String },
+        selectedProfile: { type: String },
         onComplete: { type: Function },
         onExternalLink: { type: Function },
         onLicenseChanged: { type: Function },
@@ -431,6 +469,7 @@ export class OnboardingView extends LitElement {
         this.checkoutBusy = false;
         this.checkoutError = '';
         this.selectedSku = 'search_pass';
+        this.selectedProfile = DEFAULT_SESSION_PROFILE_ID;
         this.onComplete = () => {};
         this.onExternalLink = () => {};
         this.onLicenseChanged = () => {};
@@ -528,9 +567,10 @@ export class OnboardingView extends LitElement {
 
     async completeOnboarding() {
         if (this.contextText.trim()) {
-            await cheatingDaddy.storage.updatePreference('customPrompt', this.contextText.trim());
+            await cheatingDaddy.storage.setProfileContext(this.selectedProfile, this.contextText.trim());
         }
 
+        await cheatingDaddy.storage.updatePreference('selectedProfile', this.selectedProfile);
         await cheatingDaddy.storage.updatePreference('providerMode', 'whisper_openrouter');
         await cheatingDaddy.storage.updatePreference('whisperModel', 'base.en');
         await cheatingDaddy.storage.updateConfig('onboarded', true);
@@ -552,10 +592,27 @@ export class OnboardingView extends LitElement {
             return html`
                 <div class="slide">
                     <div class="tally-row"><span class="tally"></span></div>
-                    <div class="slide-title">Live interview autocue for your Mac.</div>
+                    <div class="slide-title">Your real-time copilot for live conversations.</div>
                     <div class="slide-text">
-                        Menace Agent listens with local Whisper, watches your screen, and feeds short ready-to-speak lines while you stay in the call.
+                        Menace listens to the conversation, understands what&rsquo;s on screen, and gives you concise, ready-to-say responses in real time.
                         AI answers are included with your pass — no API keys required.
+                    </div>
+                    <div class="form-label">What will you use Menace for first?</div>
+                    <div class="profile-list">
+                        ${getPickerProfiles().map(
+                            profile => html`
+                                <button
+                                    type="button"
+                                    class="profile-row ${this.selectedProfile === profile.id ? 'selected' : ''}"
+                                    @click=${() => {
+                                        this.selectedProfile = profile.id;
+                                    }}
+                                >
+                                    <span class="profile-row-label">${profile.label}</span>
+                                    <span class="profile-row-desc">${profile.description}</span>
+                                </button>
+                            `
+                        )}
                     </div>
                     <div class="edge-plates">
                         <div class="plate">
@@ -667,7 +724,7 @@ export class OnboardingView extends LitElement {
                     <div class="tally-row"><span class="tally lit"></span></div>
                     <div class="slide-title">Let it hear the room</div>
                     <div class="slide-text">
-                        macOS will ask for Screen & System Audio Recording. Enable Menace Agent there so it can hear the interviewer from your
+                        macOS will ask for Screen & System Audio Recording. Enable Menace Agent there so it can hear the conversation from your
                         speakers or headset.
                     </div>
                     <div class="checklist">
@@ -723,17 +780,19 @@ export class OnboardingView extends LitElement {
             `;
         }
 
+        const profile = getSessionProfile(this.selectedProfile);
+
         return html`
             <div class="slide">
                 <div class="tally-row"><span class="tally lit"></span></div>
-                <div class="slide-title">Feed the prompter</div>
-                <div class="slide-text">Paste your resume or job notes so answers sound like you. Skip if you want to add this later.</div>
+                <div class="slide-title">Prepare your session</div>
+                <div class="slide-text">${profile.contextLabel} Skip if you want to add this later on Home.</div>
                 <textarea
                     class="context-input"
-                    placeholder="Resume, job description, notes..."
+                    placeholder=${profile.contextPlaceholder}
                     .value=${this.contextText}
                     @input=${this.handleContextInput}
-                    aria-label="Resume or job context"
+                    aria-label="Session context"
                 ></textarea>
                 <div class="actions">
                     <div

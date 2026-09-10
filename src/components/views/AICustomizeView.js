@@ -1,5 +1,6 @@
 import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
 import { unifiedPageStyles } from './sharedPageStyles.js';
+import { getPickerProfiles, getSessionProfile } from '../../config/sessionProfiles.js';
 
 export class AICustomizeView extends LitElement {
     static styles = [
@@ -43,81 +44,74 @@ export class AICustomizeView extends LitElement {
 
     constructor() {
         super();
-        this.selectedProfile = 'interview';
+        this.selectedProfile = 'sales';
         this.onProfileChange = () => {};
         this._context = '';
         this._loadFromStorage();
     }
 
-    async _loadFromStorage() {
+    async _loadContextForProfile(profileId) {
         try {
-            const prefs = await cheatingDaddy.storage.getPreferences();
-            this._context = prefs.customPrompt || '';
+            this._context = await cheatingDaddy.storage.getProfileContext(profileId);
             this.requestUpdate();
         } catch (error) {
-            console.error('Error loading AI customize storage:', error);
+            console.error('Error loading session context:', error);
         }
     }
 
-    _handleProfileChange(e) {
+    async _loadFromStorage() {
+        await this._loadContextForProfile(this.selectedProfile);
+    }
+
+    updated(changedProperties) {
+        super.updated(changedProperties);
+        if (changedProperties.has('selectedProfile')) {
+            this._loadContextForProfile(this.selectedProfile);
+        }
+    }
+
+    async _handleProfileChange(e) {
+        await cheatingDaddy.storage.setProfileContext(this.selectedProfile, this._context);
         this.onProfileChange(e.target.value);
     }
 
     async _saveContext(val) {
         this._context = val;
-        await cheatingDaddy.storage.updatePreference('customPrompt', val);
-    }
-
-    _getProfileName(profile) {
-        const names = {
-            interview: 'Job Interview',
-            sales: 'Sales Call',
-            meeting: 'Business Meeting',
-            presentation: 'Presentation',
-            negotiation: 'Negotiation',
-            exam: 'Exam Assistant',
-        };
-        return names[profile] || profile;
+        await cheatingDaddy.storage.setProfileContext(this.selectedProfile, val);
     }
 
     render() {
-        const profiles = [
-            { value: 'interview', label: 'Job Interview' },
-            { value: 'sales', label: 'Sales Call' },
-            { value: 'meeting', label: 'Business Meeting' },
-            { value: 'presentation', label: 'Presentation' },
-            { value: 'negotiation', label: 'Negotiation' },
-            { value: 'exam', label: 'Exam Assistant' },
-        ];
+        const profiles = getPickerProfiles();
+        const profile = getSessionProfile(this.selectedProfile);
 
         return html`
             <div class="unified-page">
                 <div class="unified-wrap">
                     <div>
-                        <div class="page-title">AI Context</div>
+                        <div class="page-title">Session Context</div>
+                        <div class="page-subtitle">Background and instructions for each conversation type.</div>
                     </div>
 
                     <section class="surface">
                         <div class="form-grid">
                             <div class="form-group">
-                                <label class="form-label">Profile</label>
+                                <label class="form-label">Session type</label>
                                 <select class="control" .value=${this.selectedProfile} @change=${this._handleProfileChange}>
-                                    ${profiles.map(profile => html`<option value=${profile.value}>${profile.label}</option>`)}
+                                    ${profiles.map(p => html`<option value=${p.id}>${p.label}</option>`)}
                                 </select>
                             </div>
                             <div class="form-group vertical">
-                                <label class="form-label">Custom Instructions</label>
+                                <label class="form-label">${profile.contextLabel}</label>
                                 <textarea
                                     class="control"
-                                    placeholder="Resume details, role requirements, constraints..."
+                                    placeholder=${profile.contextPlaceholder}
                                     .value=${this._context}
                                     @input=${e => this._saveContext(e.target.value)}
                                 ></textarea>
-                                <div class="form-help">Sent as context at session start. Keep it short.</div>
+                                <div class="form-help">Saved per session type. Sent when you start a live session.</div>
                             </div>
                         </div>
                     </section>
-
                 </div>
             </div>
         `;

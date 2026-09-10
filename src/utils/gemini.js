@@ -40,7 +40,7 @@ function formatSpeakerResults(results) {
     let text = '';
     for (const result of results) {
         if (result.transcript && result.speakerId) {
-            const speakerLabel = result.speakerId === 1 ? 'Interviewer' : 'Candidate';
+            const speakerLabel = result.speakerId === 1 ? 'Other participant' : 'You';
             text += `[${speakerLabel}]: ${result.transcript}\n`;
         }
     }
@@ -81,7 +81,7 @@ function buildContextMessage() {
 
     if (validTurns.length === 0) return null;
 
-    const contextLines = validTurns.map(turn => `[Interviewer]: ${turn.transcription.trim()}\n[Your answer]: ${turn.ai_response.trim()}`);
+    const contextLines = validTurns.map(turn => `[Other participant]: ${turn.transcription.trim()}\n[Your answer]: ${turn.ai_response.trim()}`);
 
     return `Session reconnected. Here's the conversation so far:\n\n${contextLines.join('\n\n')}\n\nContinue from here.`;
 }
@@ -512,7 +512,7 @@ async function sendToGemma(transcription) {
     }
 }
 
-async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'interview', language = 'en-US', isReconnect = false) {
+async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'sales', language = 'en-US', isReconnect = false) {
     if (isInitializingSession) {
         console.log('Session initialization already in progress');
         return false;
@@ -538,8 +538,10 @@ async function initializeGeminiSession(apiKey, customPrompt = '', profile = 'int
     // Get enabled tools first to determine Google Search status
     const enabledTools = await getEnabledTools();
     const googleSearchEnabled = enabledTools.some(tool => tool.googleSearch);
+    // OpenRouter generates live answers when configured — it has no Google Search tool.
+    const searchInPrompt = googleSearchEnabled && !hasOpenRouterKey();
 
-    const systemPrompt = getSystemPrompt(profile, customPrompt, googleSearchEnabled);
+    const systemPrompt = getSystemPrompt(profile, customPrompt, searchInPrompt);
     currentSystemPrompt = systemPrompt; // Store for OpenRouter
 
     // Initialize new conversation session only on first connect
@@ -1062,7 +1064,7 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
         }
     });
 
-    ipcMain.handle('initialize-gemini', async (event, apiKey, customPrompt, profile = 'interview', language = 'en-US') => {
+    ipcMain.handle('initialize-gemini', async (event, apiKey, customPrompt, profile = 'sales', language = 'en-US') => {
         if (!(await ensureLicensedSession())) {
             return false;
         }

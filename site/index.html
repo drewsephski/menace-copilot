@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="Menace Agent — live sales and meeting copilot for macOS. Local Whisper transcription, included AI answers, always-on-top overlay." />
+    <meta name="description" content="Menace Agent — live conversation copilot for macOS. Real-time objection handling with context from the conversation and your screen." />
     <title>Menace Agent — Live conversation copilot for macOS</title>
     <link rel="icon" href="/logo.png" type="image/png" />
     <style>
@@ -23,9 +23,9 @@
             --tally-dim: #3a151c;
             --tally-glow: rgba(196, 30, 58, 0.35);
             --success: #5aab6e;
-            --radius-sm: 2px;
-            --radius-md: 2px;
-            --radius-hood: 3px;
+            --radius-sm: 4px;
+            --radius-md: 8px;
+            --radius-hood: 12px;
             --font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
             --font-mono: 'SF Mono', Menlo, Monaco, Consolas, monospace;
             --transition: 150ms ease;
@@ -53,9 +53,8 @@
             pointer-events: none;
             z-index: 0;
             background:
-                radial-gradient(ellipse 70% 50% at 72% 28%, rgba(196, 30, 58, 0.09) 0%, transparent 55%),
-                radial-gradient(ellipse 50% 40% at 10% 80%, rgba(247, 247, 242, 0.03) 0%, transparent 50%),
-                linear-gradient(180deg, #0b0b0b 0%, #0e0e0e 100%);
+                radial-gradient(ellipse 60% 45% at 75% 20%, rgba(196, 30, 58, 0.08) 0%, transparent 55%),
+                var(--hood);
         }
 
         .page { position: relative; z-index: 1; }
@@ -73,9 +72,7 @@
             z-index: 100;
             padding: 16px 0;
             border-bottom: 1px solid var(--border);
-            background: rgba(11, 11, 11, 0.82);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
+            background: var(--hood);
         }
 
         .header-inner {
@@ -217,8 +214,38 @@
             color: var(--secondary);
             font-size: 16px;
             line-height: 1.6;
-            max-width: 38ch;
+            max-width: 42ch;
+            margin-bottom: 20px;
+        }
+
+        .use-case-strip {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 6px 0;
             margin-bottom: 28px;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+
+        .use-case-strip span:not(.use-case-sep) {
+            padding: 0 10px;
+        }
+
+        .use-case-strip span:first-child {
+            padding-left: 0;
+        }
+
+        .use-case-sep {
+            color: var(--chrome);
+            user-select: none;
+        }
+
+        .use-case-strip .use-case-active {
+            color: var(--cream);
         }
 
         .hero-copy {
@@ -270,7 +297,7 @@
             transition: background var(--transition), border-color var(--transition), transform var(--transition);
         }
 
-        .btn:hover { text-decoration: none; transform: translateY(-1px); }
+        .btn:hover { text-decoration: none; }
         .btn:focus-visible { outline: 2px solid var(--tally); outline-offset: 2px; }
 
         .btn-primary {
@@ -311,14 +338,13 @@
             border: 1px solid var(--border);
             background: var(--hood);
             padding: 14px;
-            box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
         }
 
         .prompter-bezel {
             border: 1px solid var(--border);
-            border-radius: var(--radius-md);
+            border-radius: var(--radius-sm);
             padding: 20px 22px 24px;
-            background: linear-gradient(180deg, #0d0d0d 0%, #0b0b0b 100%);
+            background: var(--hood);
         }
 
         .prompter-header {
@@ -355,17 +381,48 @@
             padding: 3px 8px;
         }
 
+        .prompter-turn {
+            margin-bottom: 16px;
+        }
+
+        .prompter-turn:last-child {
+            margin-bottom: 0;
+        }
+
+        .prompter-turn-label {
+            font-family: var(--font-mono);
+            font-size: 10px;
+            font-weight: 400;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-bottom: 6px;
+        }
+
+        .prompter-turn-label.menace {
+            color: var(--tally);
+        }
+
         .prompter-line {
-            font-size: 18px;
+            font-size: 20px;
             font-weight: 500;
             line-height: 1.45;
             letter-spacing: -0.01em;
             color: var(--cream);
-            margin-bottom: 10px;
         }
 
-        .prompter-line.dim { color: var(--secondary); font-size: 16px; }
-        .prompter-line.faint { color: var(--muted); font-size: 14px; font-weight: 400; }
+        .prompter-line.quote {
+            font-size: 15px;
+            font-weight: 400;
+            color: var(--secondary);
+            font-style: italic;
+        }
+
+        .prompter-line.next {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--secondary);
+        }
 
         .prompter-cursor {
             display: inline-block;
@@ -384,6 +441,75 @@
 
         @media (prefers-reduced-motion: reduce) {
             .prompter-cursor { animation: none; }
+        }
+
+        /* Demo placeholder */
+        .demo-block {
+            margin-top: 48px;
+        }
+
+        .demo-label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .demo-frame {
+            position: relative;
+            aspect-ratio: 16 / 9;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            background: var(--surface);
+            overflow: hidden;
+        }
+
+        .demo-frame-inner {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            padding: 24px;
+            text-align: center;
+        }
+
+        .demo-play {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            border: 1px solid var(--border);
+            background: var(--elevated);
+            display: grid;
+            place-items: center;
+            color: var(--secondary);
+        }
+
+        .demo-frame-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--cream);
+        }
+
+        .demo-frame-note {
+            font-size: 12px;
+            color: var(--muted);
+            max-width: 32ch;
+            line-height: 1.5;
+        }
+
+        .demo-frame video {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .demo-frame.has-video .demo-frame-inner {
+            display: none;
         }
 
         /* Plates */
@@ -432,10 +558,8 @@
 
         .plate:hover,
         .plate:focus-within {
-            border-color: var(--tally-dim);
+            border-color: var(--chrome);
             background: var(--elevated);
-            transform: translateY(-2px);
-            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
         }
 
         .plates.interactive .plate.dimmed {
@@ -464,10 +588,9 @@
 
         .plate:hover .plate-icon,
         .plate:focus-within .plate-icon {
-            border-color: var(--tally-dim);
-            background: rgba(196, 30, 58, 0.12);
+            border-color: var(--chrome);
+            background: var(--hover);
             color: var(--cream);
-            box-shadow: 0 0 16px var(--tally-glow);
         }
 
         .plate-step {
@@ -512,11 +635,8 @@
         .pricing-shell {
             width: min(640px, 100%);
             border: 1px solid var(--border);
-            border-radius: var(--radius-hood);
-            background:
-                radial-gradient(ellipse 100% 80% at 50% 0%, rgba(196, 30, 58, 0.08) 0%, transparent 55%),
-                var(--surface);
-            box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+            border-radius: var(--radius-sm);
+            background: var(--surface);
             overflow: hidden;
         }
 
@@ -562,10 +682,9 @@
             right: 0;
             top: 0;
             height: 0;
-            border: 2px solid var(--tally);
-            border-radius: var(--radius-md);
+            border: 1px solid var(--tally);
+            border-radius: var(--radius-sm);
             pointer-events: none;
-            box-shadow: 0 0 24px var(--tally-glow);
             transition:
                 top 280ms cubic-bezier(0.22, 1, 0.36, 1),
                 height 280ms cubic-bezier(0.22, 1, 0.36, 1);
@@ -685,7 +804,6 @@
 
         .plan-card.selected .plan-radio {
             border-color: var(--tally);
-            box-shadow: 0 0 12px var(--tally-glow);
         }
 
         .plan-card.selected .plan-radio-dot {
@@ -817,8 +935,6 @@
             background: var(--tally-hover);
             color: var(--cream);
             text-decoration: none;
-            transform: translateY(-1px);
-            box-shadow: 0 8px 28px var(--tally-glow);
         }
 
         .checkout-cta:active {
@@ -853,8 +969,8 @@
             gap: 16px;
             padding: 36px 28px;
             border: 1px solid var(--border);
-            border-radius: var(--radius-hood);
-            background: linear-gradient(180deg, rgba(196, 30, 58, 0.06) 0%, var(--surface) 100%);
+            border-radius: var(--radius-sm);
+            background: var(--surface);
         }
 
         .cta-band h2 {
@@ -945,9 +1061,13 @@
 
         /* Responsive */
         @media (max-width: 860px) {
-            .hero-grid { grid-template-columns: 1fr; gap: 40px; }
+            .hero { padding: 48px 0 40px; }
+            .hero-grid { grid-template-columns: 1fr; gap: 32px; }
             .hero h1 { max-width: none; }
             .prompter { order: -1; }
+            .demo-block { margin-top: 32px; }
+            .use-case-strip { font-size: 10px; letter-spacing: 0.04em; }
+            .prompter-line { font-size: 17px; }
             .plates { grid-template-columns: 1fr; }
             .highlight-row { grid-template-columns: 1fr; }
             .plan-detail-list { grid-template-columns: 1fr; }
@@ -981,31 +1101,44 @@
                     <div class="hero-copy">
                         <div class="eyebrow">
                             <span class="tally lit" aria-hidden="true"></span>
-                            <span class="eyebrow-label">macOS · live copilot</span>
+                            <span class="eyebrow-label">Live conversation copilot</span>
                         </div>
-                        <h1>Ready-to-speak lines while you stay on the call.</h1>
+                        <h1>Know what to say next.</h1>
                         <p class="hero-lead">
-                            Menace Agent listens with local Whisper, reads your screen, and feeds short answers through a compact always-on-top overlay — with included AI for subscribers.
+                            Menace listens to the conversation, understands what's on screen, and gives you concise, ready-to-say responses in real time.
+                        </p>
+                        <p class="use-case-strip" aria-label="Use cases">
+                            <span class="use-case-active">Sales</span>
+                            <span class="use-case-sep" aria-hidden="true">·</span>
+                            <span>Meetings</span>
+                            <span class="use-case-sep" aria-hidden="true">·</span>
+                            <span>Interviews</span>
+                            <span class="use-case-sep" aria-hidden="true">·</span>
+                            <span>Negotiations</span>
+                            <span class="use-case-sep" aria-hidden="true">·</span>
+                            <span>Presentations</span>
+                            <span class="use-case-sep" aria-hidden="true">·</span>
+                            <span>Custom</span>
                         </p>
                         <div class="cta-row">
                             <a class="btn btn-primary btn-premium" data-hero-checkout href="https://buy.polar.sh/polar_cl_KTTV9epSEVqEQ29pqzBgJwnxetHRb65GfJf0Y3FPc3Y">
-                                <span data-hero-label>Search pass — $79</span>
+                                <span data-hero-label>90-Day Pass — $79</span>
                                 <span class="btn-arrow" aria-hidden="true">
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
                                         <path d="M7 17L17 7M17 7H8M17 7V16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
                                     </svg>
                                 </span>
                             </a>
-                            <a class="btn btn-ghost" href="#pricing">Compare passes</a>
+                            <a class="btn btn-ghost" href="#demo">Watch demo</a>
                         </div>
                         <div class="hero-trust">
+                            <span class="trust-pill"><span class="trust-pill-dot" aria-hidden="true"></span>Context from conversation + screen</span>
                             <span class="trust-pill"><span class="trust-pill-dot" aria-hidden="true"></span>Local Whisper</span>
-                            <span class="trust-pill"><span class="trust-pill-dot" aria-hidden="true"></span>Included AI</span>
                             <span class="trust-pill"><span class="trust-pill-dot" aria-hidden="true"></span>macOS native</span>
                         </div>
                     </div>
 
-                    <aside class="prompter" aria-label="Prompter preview">
+                    <aside class="prompter" aria-label="How Menace responds in a live call">
                         <div class="prompter-hood">
                             <div class="prompter-bezel">
                                 <div class="prompter-header">
@@ -1015,12 +1148,40 @@
                                     </div>
                                     <span class="prompter-chip">Sales call</span>
                                 </div>
-                                <p class="prompter-line">Lead with the ROI timeline — they care about payback in Q2.<span class="prompter-cursor" aria-hidden="true"></span></p>
-                                <p class="prompter-line dim">Mention the pilot cohort: three teams, two weeks, no integration lift.</p>
-                                <p class="prompter-line faint">Ask what success looks like for their VP before you quote.</p>
+                                <div class="prompter-turn">
+                                    <p class="prompter-turn-label">Prospect</p>
+                                    <p class="prompter-line quote">"Your competitor is half the price."</p>
+                                </div>
+                                <div class="prompter-turn">
+                                    <p class="prompter-turn-label menace">Menace</p>
+                                    <p class="prompter-line">That's fair. What matters most in the comparison for you — the monthly cost itself, or what you're getting for it?<span class="prompter-cursor" aria-hidden="true"></span></p>
+                                </div>
+                                <div class="prompter-turn">
+                                    <p class="prompter-turn-label">Next move</p>
+                                    <p class="prompter-line next">Find the real objection.</p>
+                                </div>
                             </div>
                         </div>
                     </aside>
+                </div>
+
+                <div class="demo-block" id="demo" data-reveal>
+                    <div class="demo-label">
+                        <span class="tally" aria-hidden="true"></span>
+                        <span class="eyebrow-label">Product demo · 60–90 sec</span>
+                    </div>
+                    <div class="demo-frame" data-demo-frame>
+                        <!-- Replace placeholder with: <video src="/demo.mp4" controls playsinline poster="/demo-poster.jpg"></video> and add class "has-video" to .demo-frame -->
+                        <div class="demo-frame-inner">
+                            <div class="demo-play" aria-hidden="true">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M8 5v14l11-7L8 5z" />
+                                </svg>
+                            </div>
+                            <p class="demo-frame-title">See Menace on a live call</p>
+                            <p class="demo-frame-note">Demo recording coming soon. Drop a video element here — no layout changes needed.</p>
+                        </div>
+                    </div>
                 </div>
             </section>
 
@@ -1032,7 +1193,7 @@
                             <span class="eyebrow-label">Pipeline</span>
                         </div>
                         <h2>Listen. Watch. Speak.</h2>
-                        <p>Setup lives in a normal Mac window. The live session collapses into a stealth prompter — not another dashboard fighting for attention.</p>
+                        <p>Setup lives in a normal Mac window. The live session collapses into a compact always-on-top prompter — not another dashboard fighting for attention.</p>
                     </div>
                     <div class="plates interactive" data-reveal>
                         <article class="plate" data-plate tabindex="0">
@@ -1067,8 +1228,8 @@
                                 </svg>
                             </div>
                             <div class="plate-tag">Overlay</div>
-                            <h3>Answer in the moment</h3>
-                            <p>Always-on-top, click-through lines with shortcuts — stay in Zoom, Meet, or Teams.</p>
+                            <h3>Ready-to-say responses</h3>
+                            <p>Real-time objection handling in an always-on-top overlay — stay in Zoom, Meet, or Teams.</p>
                         </article>
                     </div>
                 </div>
@@ -1083,7 +1244,7 @@
                                 <span class="eyebrow-label">Access</span>
                             </div>
                             <h2>Pick a pass</h2>
-                            <p>Both plans include hosted AI answers and local Whisper. Select a pass, review what’s included, then checkout in your browser.</p>
+                            <p>Both plans include AI answers and local Whisper. Select a pass, review what's included, then checkout in your browser.</p>
                         </div>
 
                         <div class="pricing-shell-body">
@@ -1093,8 +1254,7 @@
                                 <button type="button" class="plan-card selected" data-plan-card data-sku="search_pass" aria-pressed="true">
                                     <div class="plan-card-copy">
                                         <div class="plan-card-title">
-                                            <span class="plan-card-name">Search pass</span>
-                                            <span class="plan-badge">Popular</span>
+                                            <span class="plan-card-name">90-Day Pass</span>
                                         </div>
                                         <div class="plan-card-price-row">
                                             <span class="plan-card-price">$79</span>
@@ -1129,7 +1289,7 @@
                                 data-plan-checkout
                                 href="https://buy.polar.sh/polar_cl_KTTV9epSEVqEQ29pqzBgJwnxetHRb65GfJf0Y3FPc3Y"
                             >
-                                <span data-checkout-label>Checkout — Search pass · $79</span>
+                                <span data-checkout-label>Checkout — 90-Day Pass · $79</span>
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                                     <path d="M7 17L17 7M17 7H8M17 7V16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
                                 </svg>
@@ -1145,9 +1305,9 @@
                 <div class="wrap">
                     <div class="cta-band-inner" data-reveal>
                         <h2>Stay sharp on every call</h2>
-                        <p>Download isn’t required to buy. Checkout takes a minute — activate your key inside the Mac app when you’re ready.</p>
+                        <p>Download isn't required to buy. Checkout takes a minute — activate your key inside the Mac app when you're ready.</p>
                         <a class="btn btn-primary btn-premium" data-hero-checkout href="https://buy.polar.sh/polar_cl_KTTV9epSEVqEQ29pqzBgJwnxetHRb65GfJf0Y3FPc3Y">
-                            <span data-hero-label>Get Search pass — $79</span>
+                            <span data-hero-label>Get 90-Day Pass — $79</span>
                             <span class="btn-arrow" aria-hidden="true">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
                                     <path d="M7 17L17 7M17 7H8M17 7V16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />

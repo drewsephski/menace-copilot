@@ -1,4 +1,5 @@
 import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
+import { getSessionProfile } from '../../config/sessionProfiles.js';
 
 export class AssistantView extends LitElement {
     static styles = css`
@@ -332,28 +333,14 @@ export class AssistantView extends LitElement {
         super();
         this.responses = [];
         this.currentResponseIndex = -1;
-        this.selectedProfile = 'interview';
+        this.selectedProfile = 'sales';
         this.onSendText = () => {};
         this.isAnalyzing = false;
         this._animFrame = null;
     }
 
-    getProfileNames() {
-        return {
-            interview: 'Job Interview',
-            sales: 'Sales Call',
-            meeting: 'Business Meeting',
-            presentation: 'Presentation',
-            negotiation: 'Negotiation',
-            exam: 'Exam Assistant',
-        };
-    }
-
     getCurrentResponse() {
-        const profileNames = this.getProfileNames();
-        return this.responses.length > 0 && this.currentResponseIndex >= 0
-            ? this.responses[this.currentResponseIndex]
-            : `Listening to your ${profileNames[this.selectedProfile] || 'session'}...`;
+        return this.responses.length > 0 && this.currentResponseIndex >= 0 ? this.responses[this.currentResponseIndex] : null;
     }
 
     prepareMarkdownContent(content) {
@@ -491,18 +478,18 @@ export class AssistantView extends LitElement {
     connectedCallback() {
         super.connectedCallback();
 
-        if (window.require) {
-            const { ipcRenderer } = window.require('electron');
-
+        if (window.menaceElectron) {
             this.handlePreviousResponse = () => this.navigateToPreviousResponse();
             this.handleNextResponse = () => this.navigateToNextResponse();
             this.handleScrollUp = () => this.scrollResponseUp();
             this.handleScrollDown = () => this.scrollResponseDown();
 
-            ipcRenderer.on('navigate-previous-response', this.handlePreviousResponse);
-            ipcRenderer.on('navigate-next-response', this.handleNextResponse);
-            ipcRenderer.on('scroll-response-up', this.handleScrollUp);
-            ipcRenderer.on('scroll-response-down', this.handleScrollDown);
+            this._ipcUnsubscribers = [
+                window.menaceElectron.on('navigate-previous-response', this.handlePreviousResponse),
+                window.menaceElectron.on('navigate-next-response', this.handleNextResponse),
+                window.menaceElectron.on('scroll-response-up', this.handleScrollUp),
+                window.menaceElectron.on('scroll-response-down', this.handleScrollDown),
+            ];
         }
     }
 
@@ -510,12 +497,9 @@ export class AssistantView extends LitElement {
         super.disconnectedCallback();
         this._stopWaveformAnimation();
 
-        if (window.require) {
-            const { ipcRenderer } = window.require('electron');
-            if (this.handlePreviousResponse) ipcRenderer.removeListener('navigate-previous-response', this.handlePreviousResponse);
-            if (this.handleNextResponse) ipcRenderer.removeListener('navigate-next-response', this.handleNextResponse);
-            if (this.handleScrollUp) ipcRenderer.removeListener('scroll-response-up', this.handleScrollUp);
-            if (this.handleScrollDown) ipcRenderer.removeListener('scroll-response-down', this.handleScrollDown);
+        if (this._ipcUnsubscribers) {
+            this._ipcUnsubscribers.forEach(unsub => unsub());
+            this._ipcUnsubscribers = null;
         }
     }
 
@@ -697,7 +681,7 @@ export class AssistantView extends LitElement {
 
     updated(changedProperties) {
         super.updated(changedProperties);
-        if (changedProperties.has('responses') || changedProperties.has('currentResponseIndex')) {
+        if (changedProperties.has('responses') || changedProperties.has('currentResponseIndex') || changedProperties.has('selectedProfile')) {
             this.updateResponseContent();
         }
 
@@ -718,13 +702,28 @@ export class AssistantView extends LitElement {
 
     updateResponseContent() {
         const container = this.shadowRoot.querySelector('#responseContainer');
-        if (container) {
-            const currentResponse = this.getCurrentResponse();
-            const renderedResponse = this.renderMarkdown(currentResponse);
-            container.innerHTML = renderedResponse;
-            if (this.shouldAnimateResponse) {
-                this.dispatchEvent(new CustomEvent('response-animation-complete', { bubbles: true, composed: true }));
-            }
+        if (!container) {
+            return;
+        }
+
+        const currentResponse = this.getCurrentResponse();
+        if (!currentResponse) {
+            const emptyRoot = document.createElement('div');
+            // Lit's render isn't used here; set simple HTML for the empty state.
+            emptyRoot.innerHTML = `
+                <p><strong>Listening…</strong></p>
+                <p>${getSessionProfile(this.selectedProfile).listeningText}</p>
+                <p>Menace will surface a response when there's something worth answering.</p>
+            `;
+            container.innerHTML = '';
+            container.appendChild(emptyRoot);
+            return;
+        }
+
+        const renderedResponse = this.renderMarkdown(currentResponse);
+        container.innerHTML = renderedResponse;
+        if (this.shouldAnimateResponse) {
+            this.dispatchEvent(new CustomEvent('response-animation-complete', { bubbles: true, composed: true }));
         }
     }
 
@@ -789,7 +788,7 @@ export class AssistantView extends LitElement {
                                 d="M13 3v7h6l-8 11v-7H5z"
                             />
                         </svg>
-                        Analyze Screen
+                        Read Screen
                     </span>
                 </button>
             </div>

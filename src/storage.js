@@ -1,6 +1,11 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const {
+    encryptCredentialFields,
+    decryptCredentialFields,
+    migrateCredentialsFile,
+} = require('./utils/secureCredentials');
 
 const CONFIG_VERSION = 1;
 
@@ -21,10 +26,28 @@ const DEFAULT_CREDENTIALS = {
     licenseValidatedAt: 0,
 };
 
+const SESSION_PROFILE_IDS = ['sales', 'meeting', 'interview', 'negotiation', 'presentation', 'custom'];
+
+const DEFAULT_PROFILE_CONTEXTS = Object.fromEntries(SESSION_PROFILE_IDS.map(id => [id, '']));
+
+function normalizeStoredProfileId(profileId) {
+    if (!profileId || typeof profileId !== 'string') {
+        return 'sales';
+    }
+    if (profileId === 'exam') {
+        return 'custom';
+    }
+    if (SESSION_PROFILE_IDS.includes(profileId)) {
+        return profileId;
+    }
+    return 'sales';
+}
+
 const DEFAULT_PREFERENCES = {
     customPrompt: '',
+    profileContexts: DEFAULT_PROFILE_CONTEXTS,
     providerMode: 'whisper_openrouter',
-    selectedProfile: 'interview',
+    selectedProfile: 'sales',
     selectedLanguage: 'en-US',
     selectedScreenshotInterval: '5',
     selectedImageQuality: 'medium',
@@ -207,7 +230,32 @@ function initializeStorage() {
         }
         migrateOpenRouterDefaults();
         migrateOpenRouterFlashDefaults();
+        migrateProfileContexts();
+        migrateCredentialsFile(getCredentialsPath());
     }
+}
+
+function migrateProfileContexts() {
+    const prefsPath = getPreferencesPath();
+    const saved = readJsonFile(prefsPath, {});
+    if (saved.profileContextsMigrated) {
+        return;
+    }
+
+    const next = { ...saved };
+    const contexts = { ...DEFAULT_PROFILE_CONTEXTS, ...(saved.profileContexts || {}) };
+    const legacyProfile = normalizeStoredProfileId(saved.selectedProfile || 'interview');
+    const legacyPrompt = typeof saved.customPrompt === 'string' ? saved.customPrompt.trim() : '';
+
+    if (legacyPrompt && !contexts[legacyProfile]) {
+        contexts[legacyProfile] = legacyPrompt;
+    }
+
+    next.profileContexts = contexts;
+    next.selectedProfile = legacyProfile;
+    next.customPrompt = contexts[legacyProfile] || legacyPrompt || '';
+    next.profileContextsMigrated = true;
+    writeJsonFile(prefsPath, next);
 }
 
 // ============ CONFIG ============
@@ -244,13 +292,15 @@ function updateConfig(key, value) {
 // ============ CREDENTIALS ============
 
 function getCredentials() {
-    return readJsonFile(getCredentialsPath(), DEFAULT_CREDENTIALS);
+    const stored = readJsonFile(getCredentialsPath(), DEFAULT_CREDENTIALS);
+    return decryptCredentialFields(stored);
 }
 
 function setCredentials(credentials) {
     const current = getCredentials();
-    const updated = { ...current, ...credentials };
-    return writeJsonFile(getCredentialsPath(), updated);
+    const merged = { ...current, ...credentials };
+    const toStore = encryptCredentialFields(merged);
+    return writeJsonFile(getCredentialsPath(), toStore);
 }
 
 function getApiKey() {
@@ -307,7 +357,51 @@ function getPreferences() {
     };
 
     preferences.whisperModel = legacyWhisperModels[preferences.whisperModel] || preferences.whisperModel;
+    preferences.selectedProfile = normalizeStoredProfileId(preferences.selectedProfile);
+    preferences.profileContexts = {
+        ...DEFAULT_PROFILE_CONTEXTS,
+        ...(preferences.profileContexts || {}),
+    };
+
+    const activeProfile = preferences.selectedProfile;
+    const activeContext = preferences.profileContexts[activeProfile] || '';
+    if (!preferences.customPrompt && activeContext) {
+        preferences.customPrompt = activeContext;
+    }
+
     return preferences;
+}
+
+function getProfileContext(profileId) {
+    const preferences = getPreferences();
+    const id = normalizeStoredProfileId(profileId || preferences.selectedProfile);
+    const fromContexts = preferences.profileContexts?.[id];
+    if (typeof fromContexts === 'string' && fromContexts.trim()) {
+        return fromContexts.trim();
+    }
+
+    if (id === preferences.selectedProfile && typeof preferences.customPrompt === 'string') {
+        return preferences.customPrompt.trim();
+    }
+
+    return '';
+}
+
+function setProfileContext(profileId, context) {
+    const preferences = getPreferences();
+    const id = normalizeStoredProfileId(profileId);
+    const text = typeof context === 'string' ? context : '';
+    const profileContexts = {
+        ...preferences.profileContexts,
+        [id]: text,
+    };
+
+    const updates = { profileContexts };
+    if (id === preferences.selectedProfile) {
+        updates.customPrompt = text;
+    }
+
+    return setPreferences(updates);
 }
 
 function setPreferences(preferences) {
@@ -617,6 +711,9 @@ module.exports = {
     getPreferences,
     setPreferences,
     updatePreference,
+    getProfileContext,
+    setProfileContext,
+    normalizeStoredProfileId,
 
     // Keybinds
     getKeybinds,

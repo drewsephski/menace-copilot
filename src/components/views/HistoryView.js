@@ -1,4 +1,5 @@
 import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
+import { getProfileLabelIncludingLegacy } from '../../config/sessionProfiles.js';
 import { unifiedPageStyles } from './sharedPageStyles.js';
 
 export class HistoryView extends LitElement {
@@ -337,21 +338,9 @@ export class HistoryView extends LitElement {
         return date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
     }
 
-    getProfileNames() {
-        return {
-            interview: 'Job Interview',
-            sales: 'Sales Call',
-            meeting: 'Business Meeting',
-            presentation: 'Presentation',
-            negotiation: 'Negotiation',
-            exam: 'Exam Assistant',
-        };
-    }
-
     _getProfileLabel(session) {
         if (session.profile) {
-            const names = this.getProfileNames();
-            return names[session.profile] || session.profile;
+            return getProfileLabelIncludingLegacy(session.profile);
         }
         return 'Session';
     }
@@ -361,8 +350,7 @@ export class HistoryView extends LitElement {
         if (session.messageCount > 0) parts.push(`${session.messageCount} messages`);
         if (session.screenAnalysisCount > 0) parts.push(`${session.screenAnalysisCount} screen`);
         if (session.profile) {
-            const profileNames = this.getProfileNames();
-            parts.push(profileNames[session.profile] || session.profile);
+            parts.push(getProfileLabelIncludingLegacy(session.profile));
         }
         return parts.length > 0 ? parts.join(' · ') : 'Empty session';
     }
@@ -430,7 +418,7 @@ export class HistoryView extends LitElement {
                     ? html`
                           <div class="context-row">
                               <span class="context-key">Profile</span>
-                              <span class="context-value">${this.getProfileNames()[profile] || profile}</span>
+                              <span class="context-value">${getProfileLabelIncludingLegacy(profile)}</span>
                           </div>
                       `
                     : ''

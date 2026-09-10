@@ -1,20 +1,20 @@
 const PLANS = {
     search_pass: {
-        name: 'Search pass',
+        name: '90-Day Pass',
         price: 79,
         note: '90 days · one charge',
-        popular: true,
-        description: 'Best for interview prep sprints and job search seasons.',
+        popular: false,
+        description: 'Fixed window for a launch sprint, pilot cohort, or focused outbound push.',
         checkout: 'https://buy.polar.sh/polar_cl_KTTV9epSEVqEQ29pqzBgJwnxetHRb65GfJf0Y3FPc3Y',
         highlights: ['Included AI answers', 'Live overlay', '2 devices'],
-        features: ['Included AI answers', 'Local Whisper transcription', 'macOS desktop app', 'Stealth overlay + shortcuts'],
+        features: ['Included AI answers', 'Local Whisper transcription', 'macOS desktop app', 'Always-on-top overlay + shortcuts'],
     },
     monthly: {
         name: 'Monthly',
         price: 39,
         note: 'Cancel anytime',
-        popular: false,
-        description: 'Flexible access for ongoing sales calls and weekly meetings.',
+        popular: true,
+        description: 'Ongoing access for daily calls, pipeline reviews, and live conversations.',
         checkout: 'https://buy.polar.sh/polar_cl_yFOI4SdXApw2w0phQZnhL8jThH50xuPIfL5Ah4LLmfG',
         highlights: ['Included AI answers', 'Live overlay', '2 devices'],
         features: ['Included AI answers', 'Local Whisper transcription', 'macOS desktop app', 'Renews until cancelled'],
@@ -106,6 +106,29 @@ function initPlanPicker() {
         syncRingPosition(PLAN_ORDER.indexOf(selectedSku));
     }
 
+    function syncPlanCardLabels() {
+        cards.forEach(card => {
+            const plan = PLANS[card.dataset.sku];
+            if (!plan) return;
+
+            const nameEl = card.querySelector('.plan-card-name');
+            if (nameEl) nameEl.textContent = plan.name;
+
+            const titleRow = card.querySelector('.plan-card-title');
+            if (!titleRow) return;
+
+            const existingBadge = titleRow.querySelector('.plan-badge');
+            if (existingBadge) existingBadge.remove();
+
+            if (plan.popular) {
+                const badge = document.createElement('span');
+                badge.className = 'plan-badge';
+                badge.textContent = 'Popular';
+                titleRow.appendChild(badge);
+            }
+        });
+    }
+
     function selectPlan(sku) {
         selectedSku = sku;
         const plan = PLANS[sku];
@@ -127,6 +150,7 @@ function initPlanPicker() {
         card.addEventListener('click', () => selectPlan(card.dataset.sku));
     });
 
+    syncPlanCardLabels();
     selectPlan(selectedSku);
 
     window.addEventListener('resize', syncRingForSelection);

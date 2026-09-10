@@ -6,6 +6,7 @@ require('./utils/loadEnv').loadEnv();
 
 const { app, BrowserWindow, shell, ipcMain } = require('electron');
 const { createWindow, updateGlobalShortcuts } = require('./utils/window');
+const { checkForUpdates, getReleasePageUrl } = require('./utils/updateChecker');
 const { setupGeminiIpcHandlers, stopMacOSAudioCapture, sendToRenderer } = require('./utils/gemini');
 const storage = require('./storage');
 const polar = require('./utils/polar');
@@ -197,6 +198,25 @@ function setupStorageIpcHandlers() {
         }
     });
 
+    ipcMain.handle('storage:get-profile-context', async (event, profileId) => {
+        try {
+            return { success: true, data: storage.getProfileContext(profileId) };
+        } catch (error) {
+            console.error('Error getting profile context:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('storage:set-profile-context', async (event, profileId, context) => {
+        try {
+            storage.setProfileContext(profileId, context);
+            return { success: true };
+        } catch (error) {
+            console.error('Error setting profile context:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
     // ============ KEYBINDS ============
     ipcMain.handle('storage:get-keybinds', async () => {
         try {
@@ -363,6 +383,72 @@ function setupPolarIpcHandlers() {
 function setupGeneralIpcHandlers() {
     ipcMain.handle('get-app-version', async () => {
         return app.getVersion();
+    });
+
+    ipcMain.handle('app:check-updates', async () => {
+        try {
+            const result = await checkForUpdates();
+            return { success: true, data: result };
+        } catch (error) {
+            console.error('Error checking for updates:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('app:open-update', async () => {
+        try {
+            const releaseUrl = getReleasePageUrl();
+            if (!releaseUrl) {
+                return { success: false, error: 'No release page configured' };
+            }
+
+            await shell.openExternal(releaseUrl);
+            return { success: true };
+        } catch (error) {
+            console.error('Error opening update page:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('app:get-session-readiness', async () => {
+        try {
+            const prefs = storage.getPreferences();
+            const license = await polar.getLicenseStatus();
+            const access = getOpenRouterAccess();
+
+            let screen = { state: 'unknown', label: 'Unknown' };
+            if (process.platform === 'darwin') {
+                const { systemPreferences } = require('electron');
+                const status = systemPreferences.getMediaAccessStatus('screen');
+                if (status === 'granted') {
+                    screen = { state: 'ready', label: 'Ready' };
+                } else if (status === 'denied' || status === 'restricted') {
+                    screen = { state: 'denied', label: 'Denied' };
+                } else {
+                    screen = { state: 'pending', label: 'Needs permission' };
+                }
+            } else {
+                screen = { state: 'n/a', label: 'N/A' };
+            }
+
+            const audio = prefs.whisperModel
+                ? { state: 'ready', label: 'Ready' }
+                : { state: 'needs-setup', label: 'Needs setup' };
+
+            let ai = { state: 'needs-license', label: 'Needs pass' };
+            if (license.valid && license.hostedAi) {
+                ai = { state: 'ready', label: 'Ready' };
+            } else if (license.valid && access.available) {
+                ai = { state: 'ready', label: 'Ready' };
+            } else if (license.valid) {
+                ai = { state: 'needs-keys', label: 'Needs keys' };
+            }
+
+            return { success: true, data: { audio, screen, ai } };
+        } catch (error) {
+            console.error('Error getting session readiness:', error);
+            return { success: false, error: error.message };
+        }
     });
 
     ipcMain.handle('quit-application', async event => {

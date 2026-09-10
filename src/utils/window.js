@@ -64,8 +64,9 @@ function createWindow(sendToRenderer, geminiSessionRef) {
         hasShadow: false,
         alwaysOnTop: process.platform === 'win32',
         webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false, // TODO: change to true
+            preload: path.join(__dirname, '../preload.js'),
+            nodeIntegration: false,
+            contextIsolation: true,
             backgroundThrottling: false,
             enableBlinkFeatures: 'GetDisplayMedia',
             webSecurity: true,
@@ -232,10 +233,7 @@ function updateGlobalShortcuts(keybinds, mainWindow, sendToRenderer, geminiSessi
                     const isMac = process.platform === 'darwin';
                     const shortcutKey = isMac ? 'cmd+enter' : 'ctrl+enter';
 
-                    // Use the new handleShortcut function
-                    mainWindow.webContents.executeJavaScript(`
-                        cheatingDaddy.handleShortcut('${shortcutKey}');
-                    `);
+                    sendToRenderer('handle-shortcut', shortcutKey);
                 } catch (error) {
                     console.error('Error handling next step shortcut:', error);
                 }
@@ -337,7 +335,7 @@ function setupWindowIpcHandlers(mainWindow, sendToRenderer, geminiSessionRef) {
             }
 
             if (isLiveMode) {
-                // Collapse into a compact prompter overlay for the live interview.
+                // Collapse into a compact prompter overlay for the live session.
                 const [currentX, currentY] = mainWindow.getPosition();
                 mainWindow.setMinimumSize(MIN_LIVE_WINDOW_SIZE.width, MIN_LIVE_WINDOW_SIZE.height);
                 mainWindow.setSize(LIVE_WINDOW_SIZE.width, LIVE_WINDOW_SIZE.height, true);
