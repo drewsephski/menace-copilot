@@ -233,15 +233,25 @@ async function main() {
     );
 
     const checkout = {};
+    const benefitCatalog = {};
     for (const spec of PRODUCT_SPECS) {
         const product = await ensureProduct(org.id, spec, products, benefitsByLabel);
         checkout[spec.sku] = await ensureCheckoutLink(org.id, product, spec.name, links);
+        const benefit = benefitsByLabel.get(spec.licenseLabel);
+        if (benefit) {
+            benefitCatalog[spec.sku] = {
+                id: benefit.id,
+                label: spec.licenseLabel,
+                hostedAi: spec.sku !== 'byok_monthly',
+            };
+        }
     }
 
     const generated = {
         server: SERVER,
         organizationId: org.id,
         checkout,
+        benefits: benefitCatalog,
     };
 
     console.log('\nGenerated Polar config:\n', JSON.stringify(generated, null, 2));

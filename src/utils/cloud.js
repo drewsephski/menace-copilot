@@ -1,6 +1,8 @@
 const WebSocket = require('ws');
 const { BrowserWindow } = require('electron');
 
+const LEGACY_CLOUD_ENABLED = process.env.MENACE_ENABLE_LEGACY_CLOUD === '1';
+
 let cloudWs = null;
 let isCloudConnected = false;
 let currentCloudResponse = '';
@@ -21,9 +23,18 @@ function setOnTurnComplete(callback) {
 }
 
 function connectCloud(token, profile, userContext) {
-    // Close existing connection
+    if (!LEGACY_CLOUD_ENABLED) {
+        return Promise.reject(new Error('Legacy cloud mode is disabled'));
+    }
+
+    if (!token || typeof token !== 'string') {
+        return Promise.reject(new Error('Cloud token is required'));
+    }
+
     if (cloudWs) {
-        try { cloudWs.close(); } catch (e) {}
+        try {
+            cloudWs.close();
+        } catch (e) {}
         cloudWs = null;
         isCloudConnected = false;
     }
@@ -32,7 +43,9 @@ function connectCloud(token, profile, userContext) {
 
     return new Promise((resolve, reject) => {
         const url = `wss://api.cheatingdaddy.com/ws?token=${encodeURIComponent(token)}`;
-        console.log('[Cloud] Connecting to', url);
+        if (process.env.MENACE_DEBUG_TRANSPORT === '1') {
+            console.log('[Cloud] Connecting to legacy cloud endpoint');
+        }
 
         cloudWs = new WebSocket(url);
 
@@ -44,40 +57,40 @@ function connectCloud(token, profile, userContext) {
         }, 10000);
 
         cloudWs.on('open', () => {
-            console.log('[Cloud] WebSocket open');
+            if (process.env.MENACE_DEBUG_TRANSPORT === '1') {
+                console.log('[Cloud] WebSocket open');
+            }
             isCloudConnected = true;
             clearTimeout(timeout);
 
-            // Send config immediately after open
             const config = JSON.stringify({
                 type: 'set_config',
                 profile: profile || 'sales',
-                user_context: userContext || ''
+                user_context: userContext || '',
             });
             cloudWs.send(config);
-            console.log('[Cloud] Config sent:', profile);
-
             sendToRenderer('update-status', 'Cloud connected');
             resolve(true);
         });
 
-        cloudWs.on('message', (data) => {
+        cloudWs.on('message', data => {
             try {
                 const msg = JSON.parse(data.toString());
                 handleMessage(msg);
             } catch (e) {
-                console.error('[Cloud] Parse error:', e);
+                console.error('[Cloud] Parse error:', e.message);
             }
         });
 
         cloudWs.on('close', (code, reason) => {
-            console.log('[Cloud] WebSocket closed:', code, reason.toString());
-            console.log('[Cloud] Audio chunks sent before close:', audioChunkCount);
+            if (process.env.MENACE_DEBUG_TRANSPORT === '1') {
+                console.log('[Cloud] WebSocket closed:', code, reason.toString());
+            }
             isCloudConnected = false;
             clearTimeout(timeout);
         });
 
-        cloudWs.on('error', (err) => {
+        cloudWs.on('error', err => {
             console.error('[Cloud] WebSocket error:', err.message);
             isCloudConnected = false;
             clearTimeout(timeout);
@@ -89,11 +102,9 @@ function connectCloud(token, profile, userContext) {
 function handleMessage(msg) {
     switch (msg.type) {
         case 'connected':
-            console.log('[Cloud] Server confirmed connected');
             break;
 
         case 'transcription':
-            console.log('[Cloud] Transcription:', msg.text);
             currentTranscription = msg.text || '';
             sendToRenderer('update-status', 'Generating response...');
             break;
@@ -118,7 +129,6 @@ function handleMessage(msg) {
             break;
 
         case 'session_end':
-            console.log('[Cloud] Session ended by server');
             isCloudConnected = false;
             break;
 
@@ -128,7 +138,7 @@ function handleMessage(msg) {
             break;
 
         default:
-            console.log('[Cloud] Event:', msg.type);
+            break;
     }
 }
 
@@ -137,22 +147,23 @@ function sendCloudAudio(pcmBuffer) {
         return;
     }
 
-    cloudWs.send(pcmBuffer, { binary: true }, (err) => {
+    cloudWs.send(pcmBuffer, { binary: true }, err => {
         if (err) {
             console.error('[Cloud] Audio send error:', err.message);
         }
     });
 
     audioChunkCount++;
-    process.stdout.write('.');
 }
 
 function sendCloudText(text) {
     if (cloudWs && isCloudConnected && cloudWs.readyState === WebSocket.OPEN) {
-        cloudWs.send(JSON.stringify({
-            type: 'test_text',
-            text: text
-        }));
+        cloudWs.send(
+            JSON.stringify({
+                type: 'test_text',
+                text: text,
+            })
+        );
     }
 }
 
@@ -160,15 +171,16 @@ function sendCloudImage(base64Data) {
     if (!cloudWs || !isCloudConnected || cloudWs.readyState !== WebSocket.OPEN) {
         return false;
     }
-    cloudWs.send(JSON.stringify({
-        type: 'image',
-        image: base64Data
-    }));
+    cloudWs.send(
+        JSON.stringify({
+            type: 'image',
+            image: base64Data,
+        })
+    );
     return true;
 }
 
 function closeCloud() {
-    console.log('[Cloud] Closing. Audio chunks sent:', audioChunkCount);
     if (cloudWs) {
         try {
             if (cloudWs.readyState === WebSocket.OPEN) {
@@ -176,7 +188,7 @@ function closeCloud() {
             }
             cloudWs.close();
         } catch (e) {
-            console.error('[Cloud] Close error:', e);
+            console.error('[Cloud] Close error:', e.message);
         }
         cloudWs = null;
     }

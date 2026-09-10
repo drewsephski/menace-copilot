@@ -164,11 +164,11 @@ export class AppHeader extends LitElement {
 
     async _checkForUpdates() {
         try {
-            if (!window.menaceElectron) {
+            if (!window.menace) {
                 return;
             }
 
-            const result = await window.menaceElectron.invoke('app:check-updates');
+            const result = await window.menace.app.checkUpdates();
             if (!result?.success || !result.data) {
                 return;
             }
@@ -181,11 +181,11 @@ export class AppHeader extends LitElement {
     }
 
     async _openUpdatePage() {
-        if (!window.menaceElectron) {
+        if (!window.menace) {
             return;
         }
 
-        await window.menaceElectron.invoke('app:open-update');
+        await window.menace.app.openUpdate();
     }
 
     disconnectedCallback() {

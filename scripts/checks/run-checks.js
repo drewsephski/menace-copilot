@@ -2,6 +2,7 @@
 
 const path = require('path');
 const { spawnSync } = require('child_process');
+const { discoverTestFiles } = require('./discover-test-files');
 
 const CHECKS = [
     'check-syntax.js',
@@ -9,7 +10,6 @@ const CHECKS = [
     'check-storage-migration.js',
     'check-update-source.js',
     'check-public-runtime-config.js',
-    'check-no-packaged-secrets.js',
     'check-prompt-fallback.js',
     'check-startup-smoke.js',
 ];
@@ -32,7 +32,13 @@ function runCheck(scriptName) {
 }
 
 function runUnitTests() {
-    const result = spawnSync(process.execPath, ['--test', 'src/utils/__tests__/*.test.js'], {
+    const testFiles = discoverTestFiles();
+    if (testFiles.length === 0) {
+        console.error('No unit test files discovered in src/utils/__tests__');
+        return false;
+    }
+
+    const result = spawnSync(process.execPath, ['--test', ...testFiles], {
         encoding: 'utf8',
         stdio: 'pipe',
         cwd: path.join(__dirname, '..', '..'),

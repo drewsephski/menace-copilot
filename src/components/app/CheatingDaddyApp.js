@@ -452,12 +452,12 @@ export class CheatingDaddyApp extends LitElement {
 
     async _checkForUpdates() {
         try {
-            if (!window.menaceElectron) {
+            if (!window.menace) {
                 this._localVersion = await cheatingDaddy.getVersion();
                 return;
             }
 
-            const result = await window.menaceElectron.invoke('app:check-updates');
+            const result = await window.menace.app.checkUpdates();
             if (!result?.success || !result.data) {
                 return;
             }
@@ -505,8 +505,8 @@ export class CheatingDaddyApp extends LitElement {
     connectedCallback() {
         super.connectedCallback();
 
-        if (window.menaceElectron) {
-            const { on } = window.menaceElectron;
+        if (window.menace) {
+            const { on } = window.menace.events;
             on('new-response', response => this.addNewResponse(response));
             on('update-response', response => this.updateCurrentResponse(response));
             on('update-status', status => this.setStatus(status));
@@ -526,8 +526,8 @@ export class CheatingDaddyApp extends LitElement {
     disconnectedCallback() {
         super.disconnectedCallback();
         this._stopTimer();
-        if (window.menaceElectron) {
-            const { removeAllListeners } = window.menaceElectron;
+        if (window.menace) {
+            const { removeAllListeners } = window.menace.events;
             removeAllListeners('new-response');
             removeAllListeners('update-response');
             removeAllListeners('update-status');
@@ -618,28 +618,28 @@ export class CheatingDaddyApp extends LitElement {
     async handleClose() {
         if (this.currentView === 'assistant') {
             cheatingDaddy.stopCapture();
-            if (window.menaceElectron) {
-                await window.menaceElectron.invoke('close-session');
+            if (window.menace) {
+                await window.menace.session.close();
             }
             this.sessionActive = false;
             this._stopTimer();
             this.currentView = 'main';
         } else {
-            if (window.menaceElectron) {
-                await window.menaceElectron.invoke('quit-application');
+            if (window.menace) {
+                await window.menace.app.quit();
             }
         }
     }
 
     async _handleMinimize() {
-        if (window.menaceElectron) {
-            await window.menaceElectron.invoke('window-minimize');
+        if (window.menace) {
+            await window.menace.window.minimize();
         }
     }
 
     async handleHideToggle() {
-        if (window.menaceElectron) {
-            await window.menaceElectron.invoke('toggle-window-visibility');
+        if (window.menace) {
+            await window.menace.window.toggleVisibility();
         }
     }
 
@@ -738,8 +738,8 @@ export class CheatingDaddyApp extends LitElement {
     }
 
     async handleAPIKeyHelp() {
-        if (window.menaceElectron) {
-            await window.menaceElectron.invoke('open-external', 'https://openrouter.ai/keys');
+        if (window.menace) {
+            await window.menace.app.openExternal( 'https://openrouter.ai/keys');
         }
     }
 
@@ -773,17 +773,17 @@ export class CheatingDaddyApp extends LitElement {
     }
 
     async handleExternalLinkClick(url) {
-        if (window.menaceElectron) {
-            await window.menaceElectron.invoke('open-external', url);
+        if (window.menace) {
+            await window.menace.app.openExternal( url);
         }
     }
 
     async _openUpdate() {
-        if (!window.menaceElectron) {
+        if (!window.menace) {
             return;
         }
 
-        await window.menaceElectron.invoke('app:open-update');
+        await window.menace.app.openUpdate();
     }
 
     async handleSendText(message) {
@@ -803,8 +803,8 @@ export class CheatingDaddyApp extends LitElement {
     }
 
     async handleOnboardingComplete() {
-        if (window.menaceElectron) {
-            await window.menaceElectron.invoke('refresh-display-media-handler');
+        if (window.menace) {
+            await window.menace.window.refreshDisplayMediaHandler();
         }
 
         const license = await cheatingDaddy.license.getStatus();
@@ -816,8 +816,8 @@ export class CheatingDaddyApp extends LitElement {
     updated(changedProperties) {
         super.updated(changedProperties);
 
-        if (changedProperties.has('currentView') && window.menaceElectron) {
-            window.menaceElectron.send('view-changed', this.currentView);
+        if (changedProperties.has('currentView') && window.menace) {
+            window.menace.window.onViewChanged( this.currentView);
         }
     }
 

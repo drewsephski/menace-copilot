@@ -396,17 +396,17 @@ export class AssistantView extends LitElement {
     connectedCallback() {
         super.connectedCallback();
 
-        if (window.menaceElectron) {
+        if (window.menace) {
             this.handlePreviousResponse = () => this.navigateToPreviousResponse();
             this.handleNextResponse = () => this.navigateToNextResponse();
             this.handleScrollUp = () => this.scrollResponseUp();
             this.handleScrollDown = () => this.scrollResponseDown();
 
             this._ipcUnsubscribers = [
-                window.menaceElectron.on('navigate-previous-response', this.handlePreviousResponse),
-                window.menaceElectron.on('navigate-next-response', this.handleNextResponse),
-                window.menaceElectron.on('scroll-response-up', this.handleScrollUp),
-                window.menaceElectron.on('scroll-response-down', this.handleScrollDown),
+                window.menace.on('navigate-previous-response', this.handlePreviousResponse),
+                window.menace.on('navigate-next-response', this.handleNextResponse),
+                window.menace.on('scroll-response-up', this.handleScrollUp),
+                window.menace.on('scroll-response-down', this.handleScrollDown),
             ];
         }
     }

@@ -315,8 +315,8 @@ export class CustomizeView extends LitElement {
 
     async saveKeybinds() {
         await cheatingDaddy.storage.setKeybinds(this.keybinds);
-        if (window.menaceElectron) {
-            window.menaceElectron.send('update-keybinds', this.keybinds);
+        if (window.menace) {
+            window.menace.window.onKeybindsChanged( this.keybinds);
         }
     }
 
@@ -425,8 +425,8 @@ export class CustomizeView extends LitElement {
     async resetKeybinds() {
         this.keybinds = this.getDefaultKeybinds();
         await cheatingDaddy.storage.setKeybinds(null);
-        if (window.menaceElectron) {
-            window.menaceElectron.send('update-keybinds', this.keybinds);
+        if (window.menace) {
+            window.menace.window.onKeybindsChanged( this.keybinds);
         }
         this.requestUpdate();
     }
@@ -459,8 +459,8 @@ export class CustomizeView extends LitElement {
             // Restore keybinds
             this.keybinds = this.getDefaultKeybinds();
             await cheatingDaddy.storage.setKeybinds(null);
-            if (window.menaceElectron) {
-                window.menaceElectron.send('update-keybinds', this.keybinds);
+            if (window.menace) {
+                window.menace.window.onKeybindsChanged( this.keybinds);
             }
 
             // Apply to local state
@@ -511,8 +511,8 @@ export class CustomizeView extends LitElement {
                 this.clearStatusMessage = 'Closing application...';
                 this.requestUpdate();
                 setTimeout(async () => {
-                    if (window.menaceElectron) {
-                        await window.menaceElectron.invoke('quit-application');
+                    if (window.menace) {
+                        await window.menace.app.quit();
                     }
                 }, 1000);
             }, 2000);

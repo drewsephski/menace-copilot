@@ -52,6 +52,14 @@ module.exports = {
                 'signature-flags': 'library',
             }),
         },
+        osxNotarize:
+            process.env.APPLE_ID && process.env.APPLE_APP_SPECIFIC_PASSWORD
+                ? {
+                      appleId: process.env.APPLE_ID,
+                      appleIdPassword: process.env.APPLE_APP_SPECIFIC_PASSWORD,
+                      teamId: process.env.APPLE_TEAM_ID || '2NHJGX6A7S',
+                  }
+                : undefined,
         // Put SystemAudioDump inside Contents/Helpers so TCC attributes capture to the app.
         afterCopy: [
             (buildPath, electronVersion, platform, arch, callback) => {

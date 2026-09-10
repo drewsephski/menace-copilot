@@ -105,6 +105,11 @@ function on(channel, listener) {
     return () => ipcRenderer.removeListener(channel, wrapper);
 }
 
+function removeAllListeners(channel) {
+    assertAllowed(channel, ON_CHANNELS);
+    ipcRenderer.removeAllListeners(channel);
+}
+
 const menace = {
     platform: process.platform,
 
@@ -123,6 +128,23 @@ const menace = {
         clear: () => invoke('polar:clear'),
         openCheckout: sku => invoke('polar:open-checkout', sku),
         openPortal: () => invoke('polar:open-portal'),
+    },
+
+    storage: {
+        getConfig: () => invoke('storage:get-config'),
+        setConfig: config => invoke('storage:set-config', config),
+        updateConfig: (key, value) => invoke('storage:update-config', key, value),
+        getCredentials: () => invoke('storage:get-credentials'),
+        setCredentials: credentials => invoke('storage:set-credentials', credentials),
+        getKeybinds: () => invoke('storage:get-keybinds'),
+        setKeybinds: keybinds => invoke('storage:set-keybinds', keybinds),
+        getAllSessions: () => invoke('storage:get-all-sessions'),
+        getSession: sessionId => invoke('storage:get-session', sessionId),
+        saveSession: (sessionId, data) => invoke('storage:save-session', sessionId, data),
+        deleteSession: sessionId => invoke('storage:delete-session', sessionId),
+        deleteAllSessions: () => invoke('storage:delete-all-sessions'),
+        getTodayLimits: () => invoke('storage:get-today-limits'),
+        clearAll: () => invoke('storage:clear-all'),
     },
 
     preferences: {
@@ -170,18 +192,8 @@ const menace = {
 
     events: {
         on,
+        removeAllListeners,
     },
 };
 
 contextBridge.exposeInMainWorld('menace', menace);
-
-contextBridge.exposeInMainWorld('menaceElectron', {
-    platform: process.platform,
-    invoke,
-    send,
-    on,
-    removeAllListeners(channel) {
-        assertAllowed(channel, ON_CHANNELS);
-        ipcRenderer.removeAllListeners(channel);
-    },
-});

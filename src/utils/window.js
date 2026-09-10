@@ -1,5 +1,5 @@
 const { BrowserWindow, globalShortcut, ipcMain, screen, shell } = require('electron');
-const { isAllowedPolarUrl } = require('./polarConfig');
+const { isAllowedExternalUrl } = require('./externalUrl');
 const path = require('node:path');
 const storage = require('../storage');
 
@@ -103,8 +103,10 @@ function createWindow(sendToRenderer, geminiSessionRef) {
     }
 
     mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-        if (typeof url === 'string' && url.length > 0) {
+        if (isAllowedExternalUrl(url)) {
             shell.openExternal(url).catch(error => console.warn('Blocked window.open navigation:', error.message));
+        } else if (url) {
+            console.warn('Blocked window.open URL:', url.slice(0, 120));
         }
         return { action: 'deny' };
     });
@@ -112,7 +114,11 @@ function createWindow(sendToRenderer, geminiSessionRef) {
     mainWindow.webContents.on('will-navigate', (event, url) => {
         if (!url.startsWith('file://')) {
             event.preventDefault();
-            shell.openExternal(url).catch(error => console.warn('Blocked navigation:', error.message));
+            if (isAllowedExternalUrl(url)) {
+                shell.openExternal(url).catch(error => console.warn('Blocked navigation:', error.message));
+            } else {
+                console.warn('Blocked navigation URL:', url.slice(0, 120));
+            }
         }
     });
 

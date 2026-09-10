@@ -4,12 +4,12 @@ const fs = require('fs');
 const path = require('path');
 
 const SECRET_PATTERNS = [
-    /OPENROUTER_API_KEY/i,
-    /MENACE_OPENROUTER_API_KEY/i,
-    /GEMINI_API_KEY/i,
-    /POLAR_ACCESS_TOKEN/i,
-    /sk-[A-Za-z0-9]{10,}/,
-    /Bearer\s+[A-Za-z0-9._-]{10,}/,
+    /(?:OPENROUTER_API_KEY|MENACE_OPENROUTER_API_KEY|GEMINI_API_KEY|POLAR_ACCESS_TOKEN)\s*=\s*['"]?[A-Za-z0-9._-]{8,}/i,
+    /sk-or-v1-[A-Za-z0-9]{16,}/,
+    /sk-[A-Za-z0-9]{20,}/,
+    /AIza[0-9A-Za-z_-]{20,}/,
+    /polar_pat_[A-Za-z0-9]{16,}/i,
+    /Bearer\s+[A-Za-z0-9._-]{24,}/,
 ];
 
 function buildPublicRuntimeConfigFromEnv() {

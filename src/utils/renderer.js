@@ -1,21 +1,79 @@
 // renderer.js — uses the contextBridge API from preload.js (no Node integration in renderer).
 
-function getElectronBridge() {
-    if (!window.menaceElectron) {
-        throw new Error('Menace Electron bridge is not available');
+function getMenace() {
+    if (!window.menace) {
+        throw new Error('Menace bridge is not available');
     }
-    return window.menaceElectron;
+    return window.menace;
 }
 
 const ipcRenderer = {
     invoke(channel, ...args) {
-        return getElectronBridge().invoke(channel, ...args);
+        const menace = getMenace();
+        const routes = {
+            'storage:get-config': () => menace.storage.getConfig(),
+            'storage:set-config': () => menace.storage.setConfig(args[0]),
+            'storage:update-config': () => menace.storage.updateConfig(args[0], args[1]),
+            'storage:get-credentials': () => menace.storage.getCredentials(),
+            'storage:set-credentials': () => menace.storage.setCredentials(args[0]),
+            'storage:get-preferences': () => menace.preferences.get(),
+            'storage:set-preferences': () => menace.preferences.set(args[0]),
+            'storage:update-preference': () => menace.preferences.update(args[0], args[1]),
+            'storage:get-profile-context': () => menace.preferences.getProfileContext(args[0]),
+            'storage:set-profile-context': () => menace.preferences.setProfileContext(args[0], args[1]),
+            'storage:get-keybinds': () => menace.storage.getKeybinds(),
+            'storage:set-keybinds': () => menace.storage.setKeybinds(args[0]),
+            'storage:get-all-sessions': () => menace.storage.getAllSessions(),
+            'storage:get-session': () => menace.storage.getSession(args[0]),
+            'storage:save-session': () => menace.storage.saveSession(args[0], args[1]),
+            'storage:delete-session': () => menace.storage.deleteSession(args[0]),
+            'storage:delete-all-sessions': () => menace.storage.deleteAllSessions(),
+            'storage:get-today-limits': () => menace.storage.getTodayLimits(),
+            'storage:clear-all': () => menace.storage.clearAll(),
+            'credentials:get-key-status': () => menace.credentials.getKeyStatus(),
+            'credentials:set-api-key': () => menace.credentials.setApiKey(args[0]),
+            'credentials:set-openrouter-api-key': () => menace.credentials.setOpenRouterApiKey(args[0]),
+            'openrouter:get-access': () => menace.credentials.getOpenRouterAccess(),
+            'polar:get-status': () => menace.license.getStatus(),
+            'polar:activate': () => menace.license.activate(args[0]),
+            'polar:clear': () => menace.license.clear(),
+            'polar:open-checkout': () => menace.license.openCheckout(args[0]),
+            'polar:open-portal': () => menace.license.openPortal(),
+            'initialize-gemini': () => menace.session.initializeGemini(args[0], args[1], args[2]),
+            'initialize-local': () => menace.session.initializeLocal(args[0], args[1], args[2], args[3]),
+            'initialize-whisper-openrouter': () => menace.session.initializeWhisperOpenRouter(args[0], args[1], args[2]),
+            'cancel-local-initialization': () => menace.session.cancelLocalInitialization(),
+            'initialize-cloud': () => menace.session.initializeCloud(args[0], args[1]),
+            'send-audio-content': () => menace.session.sendAudio(args[0]),
+            'send-mic-audio-content': () => menace.session.sendMicAudio(args[0]),
+            'send-image-content': () => menace.session.sendImage(args[0]),
+            'send-text-message': () => menace.session.sendText(args[0]),
+            'start-macos-audio': () => menace.session.startMacosAudio(),
+            'stop-macos-audio': () => menace.session.stopMacosAudio(),
+            'close-session': () => menace.session.close(),
+            'get-current-session': () => menace.session.getCurrent(),
+            'start-new-session': () => menace.session.startNew(),
+            'update-google-search-setting': () => menace.session.updateGoogleSearchSetting(args[0]),
+        };
+
+        if (!routes[channel]) {
+            throw new Error(`Unsupported IPC channel: ${channel}`);
+        }
+
+        return routes[channel]();
     },
     send(channel, ...args) {
-        getElectronBridge().send(channel, ...args);
+        const menace = getMenace();
+        if (channel === 'view-changed') {
+            return menace.window.onViewChanged(args[0]);
+        }
+        if (channel === 'update-keybinds') {
+            return menace.window.onKeybindsChanged(args[0]);
+        }
+        throw new Error(`Unsupported IPC send channel: ${channel}`);
     },
     on(channel, listener) {
-        return getElectronBridge().on(channel, (...payload) => {
+        return getMenace().events.on(channel, (...payload) => {
             listener(null, ...payload);
         });
     },
@@ -36,8 +94,8 @@ let offscreenCanvas = null;
 let offscreenContext = null;
 let currentImageQuality = 'medium'; // Store current image quality for manual screenshots
 
-const isLinux = window.menaceElectron?.platform === 'linux';
-const isMacOS = window.menaceElectron?.platform === 'darwin';
+const isLinux = window.menace?.platform === 'linux';
+const isMacOS = window.menace?.platform === 'darwin';
 
 // ============ STORAGE API ============
 // Wrapper for IPC-based storage access

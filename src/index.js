@@ -10,7 +10,7 @@ const { checkForUpdates, getReleasePageUrl } = require('./utils/updateChecker');
 const { setupGeminiIpcHandlers, stopMacOSAudioCapture, sendToRenderer } = require('./utils/gemini');
 const storage = require('./storage');
 const polar = require('./utils/polar');
-const { isAllowedPolarUrl } = require('./utils/polarConfig');
+const { isAllowedExternalUrl } = require('./utils/externalUrl');
 const { getOpenRouterAccess, getUserOpenRouterApiKey, syncLicensedHostedAccess } = require('./utils/openrouterCredentials');
 
 const geminiSessionRef = { current: null };
@@ -489,9 +489,9 @@ function setupGeneralIpcHandlers() {
             }
 
             let ai = { state: 'needs-license', label: 'Needs pass' };
-            if (license.valid && license.hostedAi) {
+            if (license.valid && license.includedAi && license.hostedAi) {
                 ai = { state: 'ready', label: 'Included AI' };
-            } else if (license.valid && access.source === 'hosted-unconfigured') {
+            } else if (license.valid && license.includedAi && access.source === 'hosted-unconfigured') {
                 ai = { state: 'unavailable', label: 'Gateway not deployed' };
             } else if (license.valid && access.available) {
                 ai = { state: 'configured', label: 'Configured' };
@@ -519,20 +519,8 @@ function setupGeneralIpcHandlers() {
 
     ipcMain.handle('open-external', async (event, url) => {
         try {
-            if (typeof url !== 'string' || url.length > 2048) {
+            if (!isAllowedExternalUrl(url)) {
                 return { success: false, error: 'Invalid URL' };
-            }
-
-            let parsed;
-            try {
-                parsed = new URL(url);
-            } catch {
-                return { success: false, error: 'Invalid URL' };
-            }
-
-            const allowedProtocols = new Set(['https:', 'http:', 'mailto:', 'x-apple.systempreferences:']);
-            if (!allowedProtocols.has(parsed.protocol) && !isAllowedPolarUrl(url)) {
-                return { success: false, error: 'URL scheme not allowed' };
             }
 
             await shell.openExternal(url);
@@ -551,8 +539,14 @@ function setupGeneralIpcHandlers() {
         }
     });
 
-    // Debug logging from renderer
+    // Opt-in transport debugging from renderer (never logs auth tokens by default)
     ipcMain.on('log-message', (event, msg) => {
-        console.log(msg);
+        if (process.env.MENACE_DEBUG_TRANSPORT === '1') {
+            const safe =
+                typeof msg === 'string'
+                    ? msg.replace(/Bearer\s+[A-Za-z0-9._-]+/gi, 'Bearer [redacted]').replace(/token=[^&\s]+/gi, 'token=[redacted]')
+                    : msg;
+            console.log(safe);
+        }
     });
 }

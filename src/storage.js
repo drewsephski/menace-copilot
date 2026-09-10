@@ -364,15 +364,17 @@ function getLicense() {
         key: typeof creds.licenseKey === 'string' ? creds.licenseKey : '',
         activationId: typeof creds.licenseActivationId === 'string' ? creds.licenseActivationId : '',
         validatedAt: Number.isFinite(creds.licenseValidatedAt) ? creds.licenseValidatedAt : 0,
+        benefitId: typeof creds.licenseBenefitId === 'string' ? creds.licenseBenefitId : '',
     };
 }
 
-function setLicense({ key, activationId, validatedAt }) {
+function setLicense({ key, activationId, validatedAt, benefitId }) {
     const current = getLicense();
     return setCredentials({
         licenseKey: key === undefined ? current.key : key,
         licenseActivationId: activationId === undefined ? current.activationId : activationId,
         licenseValidatedAt: validatedAt === undefined ? current.validatedAt : validatedAt,
+        licenseBenefitId: benefitId === undefined ? current.benefitId : benefitId,
     });
 }
 
@@ -381,6 +383,7 @@ function clearLicense() {
         licenseKey: '',
         licenseActivationId: '',
         licenseValidatedAt: 0,
+        licenseBenefitId: '',
     });
 }
 

@@ -319,7 +319,9 @@ async function sendToOpenRouter(transcription) {
     const config = getConfig();
     const modelToUse = config.openrouterModel;
 
-    console.log(`Sending answer request (${modelToUse}, ${access.source}):`, transcription.substring(0, 100) + '...');
+    if (process.env.MENACE_DEBUG_TRANSPORT === '1') {
+        console.log(`Sending answer request (${modelToUse}, ${access.source})`);
+    }
     logTransportEvent('openrouter.text.request', {
         model: modelToUse,
         transcription,
@@ -453,7 +455,9 @@ async function sendToGemma(transcription) {
         return;
     }
 
-    console.log('Sending to Gemma:', transcription.substring(0, 100) + '...');
+    if (process.env.MENACE_DEBUG_TRANSPORT === '1') {
+        console.log('Sending to Gemma');
+    }
 
     answerConversationHistory.push({
         role: 'user',

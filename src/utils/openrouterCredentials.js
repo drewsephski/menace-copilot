@@ -15,7 +15,9 @@ function syncLicensedHostedAccess(licenseStatus) {
         return;
     }
 
-    setLicensedHostedAccess(Boolean(licenseStatus.valid || licenseStatus.skipped));
+    const entitled = Boolean(licenseStatus.includedAi);
+    const active = Boolean(licenseStatus.valid || licenseStatus.skipped);
+    setLicensedHostedAccess(entitled && active);
 }
 
 function getUserOpenRouterApiKey() {

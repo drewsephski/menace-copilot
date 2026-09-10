@@ -1055,11 +1055,11 @@ export class MainView extends LitElement {
     }
 
     async _refreshReadiness() {
-        if (!window.menaceElectron) {
+        if (!window.menace) {
             return;
         }
         try {
-            const result = await window.menaceElectron.invoke('app:get-session-readiness');
+            const result = await window.menace.app.getSessionReadiness();
             if (result?.success) {
                 this._readiness = result.data;
                 this.requestUpdate();

@@ -5,6 +5,10 @@ const { app } = require('electron');
 const storage = require('../storage');
 const { POLAR_CONFIG, getPolarApiOrigin, isAllowedPolarUrl } = require('./polarConfig');
 const { syncLicensedHostedAccess, getOpenRouterAccess, isHostedOpenRouterConfigured } = require('./openrouterCredentials');
+const { resolveHostedAiEntitlement } = require('../config/hostedAiEntitlement');
+const { loadBenefitCatalog } = require('./polarBenefits');
+
+const benefitCatalog = loadBenefitCatalog();
 
 const LICENSE_KEY_MAX_LENGTH = 128;
 const STALE_GRACE_MS = 72 * 60 * 60 * 1000;
@@ -66,9 +70,26 @@ function withHostedAiStatus(status) {
     const access = getOpenRouterAccess();
     return {
         ...status,
-        hostedAi: access.source === 'hosted',
+        hostedAi: Boolean(status.includedAi && access.source === 'hosted'),
         hostedAiConfigured: isHostedOpenRouterConfigured(),
         openRouterSource: access.source,
+    };
+}
+
+function applyEntitlement(status, license) {
+    const entitlement = resolveHostedAiEntitlement({
+        license,
+        catalog: benefitCatalog,
+        skipped: Boolean(status.skipped),
+        valid: Boolean(status.valid),
+    });
+
+    return {
+        ...status,
+        includedAi: entitlement.includedAi,
+        planSku: entitlement.planSku,
+        benefitId: entitlement.benefitId,
+        entitlementReason: entitlement.reason,
     };
 }
 
@@ -85,8 +106,9 @@ function publicStatus(extra = {}) {
         error: extra.error || null,
         ...extra,
     };
-    syncLicensedHostedAccess(status);
-    return withHostedAiStatus(status);
+    const entitled = applyEntitlement(status, extra.license || null);
+    syncLicensedHostedAccess(entitled);
+    return withHostedAiStatus(entitled);
 }
 
 async function polarRequest(pathname, body) {
@@ -159,6 +181,7 @@ function successFromLicense(key, activationId, license) {
         key,
         activationId: activationId || '',
         validatedAt: Date.now(),
+        benefitId: license?.benefit_id || '',
     });
 
     return {
@@ -169,6 +192,7 @@ function successFromLicense(key, activationId, license) {
             expiresAt: license.expires_at || null,
             displayKey: maskLicenseKey(key),
             error: null,
+            license,
         }),
     };
 }
@@ -260,10 +284,13 @@ async function validateStoredLicense() {
         result = await polarRequest('/v1/customer-portal/license-keys/validate', body);
     } catch (error) {
         const stale = stored.validatedAt && Date.now() - stored.validatedAt < STALE_GRACE_MS;
+        const staleLicense =
+            stale && stored.benefitId ? { status: 'granted', benefit_id: stored.benefitId } : null;
         return publicStatus({
             valid: stale,
             stale,
             status: stale ? 'granted' : 'offline',
+            license: staleLicense,
             error: stale ? null : 'Could not reach Polar to check this license.',
         });
     }
@@ -278,10 +305,13 @@ async function validateStoredLicense() {
         }
 
         const stale = stored.validatedAt && Date.now() - stored.validatedAt < STALE_GRACE_MS && result.status >= 500;
+        const staleLicense =
+            stale && stored.benefitId ? { status: 'granted', benefit_id: stored.benefitId } : null;
         return publicStatus({
             valid: stale,
             stale,
             status: result.status === 404 ? 'missing' : 'error',
+            license: staleLicense,
             error: stale ? null : 'This license could not be validated.',
         });
     }
@@ -300,6 +330,7 @@ async function validateStoredLicense() {
         key: stored.key,
         activationId: stored.activationId,
         validatedAt: Date.now(),
+        benefitId: license.benefit_id || '',
     });
 
     return publicStatus({
@@ -308,6 +339,7 @@ async function validateStoredLicense() {
         expiresAt: license.expires_at || null,
         displayKey: maskLicenseKey(stored.key),
         error: null,
+        license,
     });
 }
 
@@ -338,7 +370,7 @@ async function getLicenseStatus() {
 
 function clearLicense() {
     storage.clearLicense();
-    syncLicensedHostedAccess({ valid: false, skipped: false });
+    syncLicensedHostedAccess({ valid: false, skipped: false, includedAi: false });
     return publicStatus({ status: 'missing' });
 }
 

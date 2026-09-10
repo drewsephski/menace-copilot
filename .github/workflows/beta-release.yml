@@ -1,0 +1,44 @@
+name: Beta Release
+
+on:
+    workflow_dispatch:
+        inputs:
+            skip_notarize:
+                description: 'Skip notarization (local testing only)'
+                required: false
+                default: 'false'
+
+jobs:
+    beta-macos:
+        runs-on: macos-latest
+        env:
+            MENACE_UPDATE_MANIFEST_URL: ${{ vars.MENACE_UPDATE_MANIFEST_URL }}
+            MENACE_RELEASE_PAGE_URL: ${{ vars.MENACE_RELEASE_PAGE_URL }}
+            MENACE_LOCAL_AI_BINARIES_BASE_URL: ${{ vars.MENACE_LOCAL_AI_BINARIES_BASE_URL }}
+            MENACE_HOSTED_API_BASE_URL: ${{ vars.MENACE_HOSTED_API_BASE_URL }}
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: '20'
+                  cache: npm
+            - run: npm ci
+            - run: npm run check
+            - name: Package macOS app
+              run: npm run package:macos
+            - name: Verify packaged artifact
+              run: npm run verify:package
+            - name: Codesign assessment
+              run: |
+                  APP="out/Menace Agent-darwin-arm64/Menace Agent.app"
+                  codesign --verify --deep --strict --verbose=2 "$APP"
+                  spctl --assess --verbose=4 --type execute "$APP" || true
+            - name: Create DMG
+              run: npx electron-forge make --platform=darwin --skip-package
+            - name: Upload beta artifacts
+              uses: actions/upload-artifact@v4
+              with:
+                  name: menace-agent-macos-beta
+                  path: |
+                      out/make/**
+                      out/Menace Agent-darwin-arm64/Menace Agent.app

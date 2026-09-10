@@ -6,8 +6,16 @@ let logStream = null;
 let isFirstEvent = true;
 let currentLogPath = null;
 
+function isTransportLoggingEnabled() {
+    return process.env.MENACE_DEBUG_TRANSPORT === '1';
+}
+
 function startTransportLog(sessionId) {
     closeTransportLog();
+
+    if (!isTransportLoggingEnabled()) {
+        return;
+    }
 
     const logsDirectory = path.join(getConfigDir(), 'logs');
     fs.mkdirSync(logsDirectory, { recursive: true });
@@ -25,7 +33,7 @@ function startTransportLog(sessionId) {
 }
 
 function logTransportEvent(type, data) {
-    if (!logStream) {
+    if (!logStream || !isTransportLoggingEnabled()) {
         return;
     }
 
@@ -56,6 +64,7 @@ function closeTransportLog() {
 }
 
 module.exports = {
+    isTransportLoggingEnabled,
     startTransportLog,
     logTransportEvent,
     closeTransportLog,
