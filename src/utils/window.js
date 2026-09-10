@@ -1,4 +1,5 @@
-const { BrowserWindow, globalShortcut, ipcMain, screen } = require('electron');
+const { BrowserWindow, globalShortcut, ipcMain, screen, shell } = require('electron');
+const { isAllowedPolarUrl } = require('./polarConfig');
 const path = require('node:path');
 const storage = require('../storage');
 
@@ -100,6 +101,20 @@ function createWindow(sendToRenderer, geminiSessionRef) {
             console.warn('Could not hide from Mission Control:', error.message);
         }
     }
+
+    mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+        if (typeof url === 'string' && url.length > 0) {
+            shell.openExternal(url).catch(error => console.warn('Blocked window.open navigation:', error.message));
+        }
+        return { action: 'deny' };
+    });
+
+    mainWindow.webContents.on('will-navigate', (event, url) => {
+        if (!url.startsWith('file://')) {
+            event.preventDefault();
+            shell.openExternal(url).catch(error => console.warn('Blocked navigation:', error.message));
+        }
+    });
 
     mainWindow.loadFile(path.join(__dirname, '../index.html'));
 

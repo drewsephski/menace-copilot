@@ -113,7 +113,17 @@ function setupStorageIpcHandlers() {
     // ============ CREDENTIALS ============
     ipcMain.handle('storage:get-credentials', async () => {
         try {
-            return { success: true, data: storage.getCredentials() };
+            const creds = storage.getCredentials();
+            return {
+                success: true,
+                data: {
+                    hasApiKey: Boolean(creds.apiKey?.trim()),
+                    hasOpenRouterApiKey: Boolean(creds.openrouterApiKey?.trim()),
+                    hasCloudToken: Boolean(creds.cloudToken?.trim()),
+                    hasOpenaiKey: Boolean(creds.openaiKey?.trim()),
+                    licenseValidatedAt: creds.licenseValidatedAt || 0,
+                },
+            };
         } catch (error) {
             console.error('Error getting credentials:', error);
             return { success: false, error: error.message };
@@ -122,7 +132,23 @@ function setupStorageIpcHandlers() {
 
     ipcMain.handle('storage:set-credentials', async (event, credentials) => {
         try {
-            storage.setCredentials(credentials);
+            if (!credentials || typeof credentials !== 'object') {
+                return { success: false, error: 'Invalid credentials payload' };
+            }
+
+            const updates = {};
+            if (typeof credentials.cloudToken === 'string') {
+                updates.cloudToken = credentials.cloudToken;
+            }
+            if (typeof credentials.openaiKey === 'string') {
+                updates.openaiKey = credentials.openaiKey;
+            }
+
+            if (Object.keys(updates).length === 0) {
+                return { success: false, error: 'No supported credential fields provided' };
+            }
+
+            storage.setCredentials(updates);
             return { success: true };
         } catch (error) {
             console.error('Error setting credentials:', error);
@@ -130,17 +156,28 @@ function setupStorageIpcHandlers() {
         }
     });
 
-    ipcMain.handle('storage:get-api-key', async () => {
+    ipcMain.handle('credentials:get-key-status', async () => {
         try {
-            return { success: true, data: storage.getApiKey() };
+            const geminiKey = storage.getApiKey();
+            const openrouterKey = getUserOpenRouterApiKey();
+            return {
+                success: true,
+                data: {
+                    hasGeminiKey: Boolean(geminiKey && geminiKey.trim()),
+                    hasOpenRouterKey: Boolean(openrouterKey && openrouterKey.trim()),
+                },
+            };
         } catch (error) {
-            console.error('Error getting API key:', error);
+            console.error('Error getting credential status:', error);
             return { success: false, error: error.message };
         }
     });
 
-    ipcMain.handle('storage:set-api-key', async (event, apiKey) => {
+    ipcMain.handle('credentials:set-api-key', async (event, apiKey) => {
         try {
+            if (typeof apiKey !== 'string') {
+                return { success: false, error: 'Invalid API key' };
+            }
             storage.setApiKey(apiKey);
             return { success: true };
         } catch (error) {
@@ -149,17 +186,11 @@ function setupStorageIpcHandlers() {
         }
     });
 
-    ipcMain.handle('storage:get-openrouter-api-key', async () => {
+    ipcMain.handle('credentials:set-openrouter-api-key', async (event, openrouterApiKey) => {
         try {
-            return { success: true, data: getUserOpenRouterApiKey() };
-        } catch (error) {
-            console.error('Error getting OpenRouter API key:', error);
-            return { success: false, error: error.message };
-        }
-    });
-
-    ipcMain.handle('storage:set-openrouter-api-key', async (event, openrouterApiKey) => {
-        try {
+            if (typeof openrouterApiKey !== 'string') {
+                return { success: false, error: 'Invalid API key' };
+            }
             storage.setOpenRouterApiKey(openrouterApiKey);
             return { success: true };
         } catch (error) {
@@ -412,6 +443,9 @@ function setupGeneralIpcHandlers() {
 
     ipcMain.handle('app:get-session-readiness', async () => {
         try {
+            const fs = require('fs');
+            const path = require('path');
+            const { app } = require('electron');
             const prefs = storage.getPreferences();
             const license = await polar.getLicenseStatus();
             const access = getOpenRouterAccess();
@@ -428,18 +462,39 @@ function setupGeneralIpcHandlers() {
                     screen = { state: 'pending', label: 'Needs permission' };
                 }
             } else {
-                screen = { state: 'n/a', label: 'N/A' };
+                screen = { state: 'unknown', label: 'Grant on first capture' };
             }
 
-            const audio = prefs.whisperModel
-                ? { state: 'ready', label: 'Ready' }
-                : { state: 'needs-setup', label: 'Needs setup' };
+            let audio = { state: 'unknown', label: 'Unknown' };
+            const whisperModel = prefs.whisperModel || '';
+            if (!whisperModel) {
+                audio = { state: 'needs-setup', label: 'Needs setup' };
+            } else if (process.platform === 'darwin') {
+                const helperPath = app.isPackaged
+                    ? path.join(process.resourcesPath, '..', 'Helpers', 'SystemAudioDump')
+                    : path.join(__dirname, 'assets', 'SystemAudioDump');
+                audio = fs.existsSync(helperPath)
+                    ? { state: 'configured', label: 'Configured' }
+                    : { state: 'unavailable', label: 'Helper missing' };
+            } else {
+                audio = { state: 'configured', label: 'Configured' };
+            }
+
+            if ((prefs.audioMode === 'mic_only' || prefs.audioMode === 'both') && process.platform === 'darwin') {
+                const { systemPreferences } = require('electron');
+                const micStatus = systemPreferences.getMediaAccessStatus('microphone');
+                if (micStatus !== 'granted') {
+                    audio = { state: 'pending', label: 'Needs mic permission' };
+                }
+            }
 
             let ai = { state: 'needs-license', label: 'Needs pass' };
             if (license.valid && license.hostedAi) {
-                ai = { state: 'ready', label: 'Ready' };
+                ai = { state: 'ready', label: 'Included AI' };
+            } else if (license.valid && access.source === 'hosted-unconfigured') {
+                ai = { state: 'unavailable', label: 'Gateway not deployed' };
             } else if (license.valid && access.available) {
-                ai = { state: 'ready', label: 'Ready' };
+                ai = { state: 'configured', label: 'Configured' };
             } else if (license.valid) {
                 ai = { state: 'needs-keys', label: 'Needs keys' };
             }

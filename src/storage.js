@@ -53,7 +53,7 @@ const DEFAULT_PREFERENCES = {
     selectedImageQuality: 'medium',
     advancedMode: false,
     audioMode: 'speaker_only',
-    fontSize: 'medium',
+    fontSize: 20,
     backgroundTransparency: 0.8,
     googleSearchEnabled: false,
     localLlmModel: 'unsloth/Qwen3.5-4B-GGUF:Q4_K_M',
@@ -231,8 +231,47 @@ function initializeStorage() {
         migrateOpenRouterDefaults();
         migrateOpenRouterFlashDefaults();
         migrateProfileContexts();
+        migrateFontSizePreference();
         migrateCredentialsFile(getCredentialsPath());
     }
+}
+
+function normalizeFontSize(value) {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        return Math.min(32, Math.max(12, Math.round(value)));
+    }
+
+    if (typeof value === 'string') {
+        const trimmed = value.trim().toLowerCase();
+        const numeric = Number.parseInt(trimmed, 10);
+        if (Number.isFinite(numeric)) {
+            return Math.min(32, Math.max(12, numeric));
+        }
+
+        const named = {
+            small: 16,
+            medium: 20,
+            large: 24,
+        };
+        if (named[trimmed]) {
+            return named[trimmed];
+        }
+    }
+
+    return DEFAULT_PREFERENCES.fontSize;
+}
+
+function migrateFontSizePreference() {
+    const prefsPath = getPreferencesPath();
+    const saved = readJsonFile(prefsPath, {});
+    if (saved.fontSizeMigrated) {
+        return;
+    }
+
+    const next = { ...saved };
+    next.fontSize = normalizeFontSize(saved.fontSize);
+    next.fontSizeMigrated = true;
+    writeJsonFile(prefsPath, next);
 }
 
 function migrateProfileContexts() {
@@ -357,6 +396,7 @@ function getPreferences() {
     };
 
     preferences.whisperModel = legacyWhisperModels[preferences.whisperModel] || preferences.whisperModel;
+    preferences.fontSize = normalizeFontSize(preferences.fontSize);
     preferences.selectedProfile = normalizeStoredProfileId(preferences.selectedProfile);
     preferences.profileContexts = {
         ...DEFAULT_PROFILE_CONTEXTS,
@@ -708,12 +748,14 @@ module.exports = {
     clearLicense,
 
     // Preferences
+    DEFAULT_PREFERENCES,
     getPreferences,
     setPreferences,
     updatePreference,
     getProfileContext,
     setProfileContext,
     normalizeStoredProfileId,
+    normalizeFontSize,
 
     // Keybinds
     getKeybinds,

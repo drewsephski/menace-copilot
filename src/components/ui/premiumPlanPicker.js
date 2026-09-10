@@ -3,10 +3,10 @@ import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
 const DEFAULT_PLANS = [
     {
         sku: 'search_pass',
-        name: 'Search pass',
+        name: '90-Day Pass',
         price: 79,
         note: '90 days · included AI',
-        popular: true,
+        popular: false,
         highlights: ['AI included', 'No API keys', 'Best value'],
     },
     {
@@ -14,7 +14,7 @@ const DEFAULT_PLANS = [
         name: 'Monthly',
         price: 39,
         note: 'Cancel anytime · included AI',
-        popular: false,
+        popular: true,
         highlights: ['AI included', 'No API keys', 'Live overlay'],
     },
     {
@@ -52,10 +52,9 @@ export class PremiumPlanPicker extends LitElement {
             right: 0;
             top: 0;
             height: 0;
-            border: 2px solid var(--tally);
-            border-radius: var(--radius-md);
+            border: 1px solid var(--tally);
+            border-radius: var(--radius-sm);
             pointer-events: none;
-            box-shadow: 0 0 24px var(--tally-glow);
             transition:
                 top 280ms cubic-bezier(0.22, 1, 0.36, 1),
                 height 280ms cubic-bezier(0.22, 1, 0.36, 1);
@@ -177,7 +176,6 @@ export class PremiumPlanPicker extends LitElement {
 
         .plan-card.selected .plan-radio {
             border-color: var(--tally);
-            box-shadow: 0 0 12px var(--tally-glow);
         }
 
         .plan-card.selected .plan-radio-dot {
@@ -186,7 +184,7 @@ export class PremiumPlanPicker extends LitElement {
         }
 
         .plan-card.selected .plan-price {
-            color: var(--tally);
+            color: var(--text-primary);
         }
 
         .highlights {

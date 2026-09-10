@@ -1035,11 +1035,15 @@ export class MainView extends LitElement {
                 await cheatingDaddy.storage.updatePreference('providerMode', 'whisper_openrouter');
             }
 
-            // Load keys
-            this._token = creds.cloudToken || '';
-            this._geminiKey = (await cheatingDaddy.storage.getApiKey().catch(() => '')) || '';
-            this._openrouterKey = (await cheatingDaddy.storage.getOpenRouterApiKey().catch(() => '')) || '';
-            this._openaiKey = creds.openaiKey || '';
+            const keyStatus = await cheatingDaddy.storage.getKeyStatus().catch(() => ({
+                hasGeminiKey: false,
+                hasOpenRouterKey: false,
+            }));
+
+            this._token = creds.hasCloudToken ? 'saved' : '';
+            this._geminiKey = keyStatus.hasGeminiKey ? 'saved' : '';
+            this._openrouterKey = keyStatus.hasOpenRouterKey ? 'saved' : '';
+            this._openaiKey = creds.hasOpenaiKey ? 'saved' : '';
             this._whisperModel = prefs.whisperModel || 'base.en';
             this._answerModel = config.openrouterModel || 'google/gemini-3.5-flash-lite';
             this._profileContext = await cheatingDaddy.storage.getProfileContext(this.selectedProfile);
@@ -1129,8 +1133,7 @@ export class MainView extends LitElement {
         this._token = val;
         this._tokenError = false;
         try {
-            const creds = await cheatingDaddy.storage.getCredentials().catch(() => ({}));
-            await cheatingDaddy.storage.setCredentials({ ...creds, cloudToken: val });
+            await cheatingDaddy.storage.setCredentials({ cloudToken: val });
         } catch (e) {}
         this.requestUpdate();
     }
@@ -1151,8 +1154,7 @@ export class MainView extends LitElement {
     async _saveOpenaiKey(val) {
         this._openaiKey = val;
         try {
-            const creds = await cheatingDaddy.storage.getCredentials().catch(() => ({}));
-            await cheatingDaddy.storage.setCredentials({ ...creds, openaiKey: val });
+            await cheatingDaddy.storage.setCredentials({ openaiKey: val });
         } catch (e) {}
         this.requestUpdate();
     }

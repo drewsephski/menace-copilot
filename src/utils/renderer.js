@@ -62,19 +62,15 @@ const storage = {
     async setCredentials(credentials) {
         return ipcRenderer.invoke('storage:set-credentials', credentials);
     },
-    async getApiKey() {
-        const result = await ipcRenderer.invoke('storage:get-api-key');
-        return result.success ? result.data : '';
+    async getKeyStatus() {
+        const result = await ipcRenderer.invoke('credentials:get-key-status');
+        return result.success ? result.data : { hasGeminiKey: false, hasOpenRouterKey: false };
     },
     async setApiKey(apiKey) {
-        return ipcRenderer.invoke('storage:set-api-key', apiKey);
-    },
-    async getOpenRouterApiKey() {
-        const result = await ipcRenderer.invoke('storage:get-openrouter-api-key');
-        return result.success ? result.data : '';
+        return ipcRenderer.invoke('credentials:set-api-key', apiKey);
     },
     async setOpenRouterApiKey(openrouterApiKey) {
-        return ipcRenderer.invoke('storage:set-openrouter-api-key', openrouterApiKey);
+        return ipcRenderer.invoke('credentials:set-openrouter-api-key', openrouterApiKey);
     },
 
     // Preferences
@@ -199,15 +195,12 @@ async function getSessionContext(profile) {
 }
 
 async function initializeGemini(profile = 'sales', language = 'en-US') {
-    const apiKey = await storage.getApiKey();
-    if (apiKey) {
-        const customPrompt = await getSessionContext(profile);
-        const success = await ipcRenderer.invoke('initialize-gemini', apiKey, customPrompt, profile, language);
-        if (success) {
-            cheatingDaddy.setStatus('Live');
-        } else {
-            cheatingDaddy.setStatus('error');
-        }
+    const customPrompt = await getSessionContext(profile);
+    const success = await ipcRenderer.invoke('initialize-gemini', customPrompt, profile, language);
+    if (success) {
+        cheatingDaddy.setStatus('Live');
+    } else {
+        cheatingDaddy.setStatus('error');
     }
 }
 
@@ -248,14 +241,13 @@ async function cancelLocalInitialization() {
 
 async function initializeCloud(profile = 'sales') {
     const creds = await storage.getCredentials();
-    const token = creds.cloudToken;
-    if (!token || !token.trim()) {
+    if (!creds.hasCloudToken) {
         cheatingDaddy.setStatus('error');
         return false;
     }
 
     const customPrompt = await getSessionContext(profile);
-    const success = await ipcRenderer.invoke('initialize-cloud', token, profile, customPrompt);
+    const success = await ipcRenderer.invoke('initialize-cloud', profile, customPrompt);
     if (success) {
         cheatingDaddy.setStatus('Live');
         return true;

@@ -2,18 +2,7 @@ const { FusesPlugin } = require('@electron-forge/plugin-fuses');
 const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 const fs = require('fs');
 const path = require('path');
-
-function embedHostedEnv(buildPath) {
-    require('./src/utils/loadEnv').loadEnv();
-    const key = process.env.OPENROUTER_API_KEY || process.env.MENACE_OPENROUTER_API_KEY || '';
-    if (!key.trim()) {
-        return;
-    }
-
-    const resourcesPath = path.join(buildPath, 'Contents', 'Resources');
-    fs.mkdirSync(resourcesPath, { recursive: true });
-    fs.writeFileSync(path.join(resourcesPath, 'menace-hosted.env'), `OPENROUTER_API_KEY=${key.trim()}\n`, 'utf8');
-}
+const { writePublicRuntimeConfig } = require('./scripts/build-public-runtime-config');
 
 function installMacAudioHelper(buildPath) {
     const helpersDir = path.join(buildPath, 'Contents', 'Helpers');
@@ -46,9 +35,9 @@ module.exports = {
         // Required for system/loopback audio on macOS 14.2+ / 26+
         extendInfo: {
             NSAudioCaptureUsageDescription:
-                'Menace Agent needs system audio access to hear the interviewer from your computer speakers or headset.',
+                'Menace Agent needs system audio access to hear other participants in the conversation from your computer speakers or headset.',
             NSScreenCaptureDescription:
-                'Menace Agent needs screen capture for contextual interview assistance.',
+                'Menace Agent needs screen capture for contextual live conversation assistance.',
             NSMicrophoneUsageDescription: 'Menace Agent needs microphone access when mic mode is enabled.',
             ElectronTeamID: '2NHJGX6A7S',
             CFBundleDisplayName: 'Menace Agent',
@@ -67,9 +56,13 @@ module.exports = {
         afterCopy: [
             (buildPath, electronVersion, platform, arch, callback) => {
                 try {
+                    const resourcesPath =
+                        platform === 'darwin'
+                            ? path.join(buildPath, 'Contents', 'Resources')
+                            : path.join(buildPath, 'resources');
+                    writePublicRuntimeConfig(resourcesPath);
                     if (platform === 'darwin') {
                         installMacAudioHelper(buildPath);
-                        embedHostedEnv(buildPath);
                     }
                     callback();
                 } catch (error) {
@@ -110,7 +103,7 @@ module.exports = {
                     name: 'Menace Agent',
                     productName: 'Menace Agent',
                     genericName: 'AI Assistant',
-                    description: 'Live interview autocue with OpenRouter and local Whisper',
+                    description: 'Menace Agent — real-time conversation copilot with local Whisper and included or BYOK AI',
                     categories: ['Productivity', 'Education'],
                     icon: 'src/assets/logo.png',
                 },

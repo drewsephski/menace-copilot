@@ -664,7 +664,7 @@ export class CheatingDaddyApp extends LitElement {
 
         if (providerMode === 'cloud') {
             const creds = await cheatingDaddy.storage.getCredentials();
-            if (!creds.cloudToken || creds.cloudToken.trim() === '') {
+            if (!creds.hasCloudToken) {
                 const mainView = this.shadowRoot.querySelector('main-view');
                 if (mainView && mainView.triggerApiKeyError) {
                     mainView.triggerApiKeyError();
@@ -712,8 +712,8 @@ export class CheatingDaddyApp extends LitElement {
                 return;
             }
         } else {
-            const apiKey = await cheatingDaddy.storage.getApiKey();
-            if (!apiKey || apiKey === '') {
+            const keyStatus = await cheatingDaddy.storage.getKeyStatus();
+            if (!keyStatus.hasGeminiKey) {
                 const mainView = this.shadowRoot.querySelector('main-view');
                 if (mainView && mainView.triggerApiKeyError) {
                     mainView.triggerApiKeyError();

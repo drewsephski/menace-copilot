@@ -1,6 +1,7 @@
 'use strict';
 
 const storage = require('../storage');
+const { isHostedGatewayConfigured } = require('../config/publicRuntimeConfig');
 
 let licensedHostedAccess = false;
 
@@ -17,47 +18,37 @@ function syncLicensedHostedAccess(licenseStatus) {
     setLicensedHostedAccess(Boolean(licenseStatus.valid || licenseStatus.skipped));
 }
 
-function getHostedOpenRouterApiKey() {
-    const key = process.env.OPENROUTER_API_KEY || process.env.MENACE_OPENROUTER_API_KEY || '';
-    return typeof key === 'string' ? key.trim() : '';
-}
-
-function isHostedOpenRouterConfigured() {
-    return getHostedOpenRouterApiKey().length > 0;
-}
-
 function getUserOpenRouterApiKey() {
     const key = storage.getOpenRouterApiKey();
     return key && key.trim() ? key.trim() : '';
 }
 
-function getEffectiveOpenRouterApiKey() {
-    const userKey = getUserOpenRouterApiKey();
-    if (userKey) {
-        return userKey;
-    }
+function isHostedOpenRouterConfigured() {
+    return isHostedGatewayConfigured();
+}
 
-    if (licensedHostedAccess && isHostedOpenRouterConfigured()) {
-        return getHostedOpenRouterApiKey();
-    }
-
+function getHostedOpenRouterApiKey() {
     return '';
+}
+
+function getEffectiveOpenRouterApiKey() {
+    return getUserOpenRouterApiKey();
 }
 
 function getOpenRouterAccess() {
     const userKey = getUserOpenRouterApiKey();
     if (userKey) {
-        return { available: true, source: 'user', hostedConfigured: isHostedOpenRouterConfigured() };
+        return { available: true, source: 'user', hostedConfigured: isHostedGatewayConfigured() };
     }
 
-    if (licensedHostedAccess && isHostedOpenRouterConfigured()) {
+    if (licensedHostedAccess && isHostedGatewayConfigured()) {
         return { available: true, source: 'hosted', hostedConfigured: true };
     }
 
     return {
         available: false,
-        source: 'none',
-        hostedConfigured: isHostedOpenRouterConfigured(),
+        source: licensedHostedAccess ? 'hosted-unconfigured' : 'none',
+        hostedConfigured: isHostedGatewayConfigured(),
     };
 }
 

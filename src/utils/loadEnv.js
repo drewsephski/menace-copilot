@@ -13,10 +13,6 @@ function loadEnv() {
         path.join(process.cwd(), '.env'),
     ];
 
-    if (process.resourcesPath) {
-        candidates.push(path.join(process.resourcesPath, 'menace-hosted.env'));
-    }
-
     for (const envPath of candidates) {
         if (!fs.existsSync(envPath)) {
             continue;

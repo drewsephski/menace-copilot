@@ -17,13 +17,13 @@
         "install:macos": "node scripts/install-macos-app.js",
         "publish": "electron-forge publish",
         "lint": "node scripts/checks/check-syntax.js",
-        "test": "node scripts/checks/run-checks.js",
+        "test": "node --test src/utils/__tests__/*.test.js",
+        "test:prompts": "node --test src/utils/__tests__/prompts.test.js",
+        "eval:live": "node scripts/eval/live-eval.js",
         "check": "node scripts/checks/run-checks.js",
         "polar:sync": "node scripts/sync-polar-production.js --write",
         "polar:test-discount": "node scripts/create-polar-test-discount.js",
-        "test:license-flow": "node scripts/test-hosted-license-flow.js",
-        "test": "node --test src/utils/__tests__/prompts.test.js",
-        "test:prompts": "node --test src/utils/__tests__/prompts.test.js"
+        "test:license-flow": "node scripts/test-hosted-license-flow.js"
     },
     "keywords": [
         "menace agent",

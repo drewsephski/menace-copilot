@@ -145,11 +145,8 @@ function main() {
 
     copyHelper(appPath);
 
-    require(path.join(projectRoot, 'src/utils/loadEnv')).loadEnv();
-    const hostedKey = process.env.OPENROUTER_API_KEY || process.env.MENACE_OPENROUTER_API_KEY || '';
-    if (hostedKey.trim()) {
-        fs.writeFileSync(path.join(resourcesDir, 'menace-hosted.env'), `OPENROUTER_API_KEY=${hostedKey.trim()}\n`, 'utf8');
-    }
+    const { writePublicRuntimeConfig } = require(path.join(projectRoot, 'scripts/build-public-runtime-config'));
+    writePublicRuntimeConfig(resourcesDir);
 
     // Info.plist
     const plistPath = path.join(appPath, 'Contents', 'Info.plist');
@@ -160,8 +157,8 @@ function main() {
         CFBundleExecutable: 'Menace Agent',
         CFBundleShortVersionString: require(path.join(projectRoot, 'package.json')).version,
         NSAudioCaptureUsageDescription:
-            'Menace Agent needs system audio access to hear the interviewer from your computer speakers or headset.',
-        NSScreenCaptureDescription: 'Menace Agent needs screen capture for contextual interview assistance.',
+            'Menace Agent needs system audio access to hear other participants in the conversation from your computer speakers or headset.',
+        NSScreenCaptureDescription: 'Menace Agent needs screen capture for contextual live conversation assistance.',
         NSMicrophoneUsageDescription: 'Menace Agent needs microphone access when mic mode is enabled.',
         ElectronTeamID: '2NHJGX6A7S',
     };

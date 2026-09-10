@@ -1,27 +1,18 @@
 'use strict';
 
+const { getUpdateManifestUrl, getReleasePageUrl } = require('./publicRuntimeConfig');
+
 /**
  * Menace-owned update and release endpoints.
  *
- * Set via environment at build/packaging time when a production channel exists:
- *   MENACE_UPDATE_MANIFEST_URL  — JSON manifest with a `version` field (e.g. package.json)
- *   MENACE_RELEASE_PAGE_URL     — human-facing download / release page opened by "Update available"
- *
+ * Values are loaded from menace-runtime-config.json at packaging time, with env overrides for development.
  * When unset, update checks fail silently and the update action does nothing.
  */
 
-function trimOrNull(value) {
-    if (typeof value !== 'string') {
-        return null;
-    }
-    const trimmed = value.trim();
-    return trimmed.length > 0 ? trimmed : null;
-}
-
 function getUpdateSource() {
     return {
-        versionManifestUrl: trimOrNull(process.env.MENACE_UPDATE_MANIFEST_URL),
-        releasePageUrl: trimOrNull(process.env.MENACE_RELEASE_PAGE_URL),
+        versionManifestUrl: getUpdateManifestUrl(),
+        releasePageUrl: getReleasePageUrl(),
     };
 }
 

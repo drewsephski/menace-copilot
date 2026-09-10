@@ -245,17 +245,6 @@ export class CustomizeView extends LitElement {
         }
     }
 
-    getProfiles() {
-        return [
-            { value: 'interview', name: 'Job Interview' },
-            { value: 'sales', name: 'Sales Call' },
-            { value: 'meeting', name: 'Business Meeting' },
-            { value: 'presentation', name: 'Presentation' },
-            { value: 'negotiation', name: 'Negotiation' },
-            { value: 'exam', name: 'Exam Assistant' },
-        ];
-    }
-
     getLanguages() {
         return [
             { value: 'en-US', name: 'English (US)' },
@@ -331,11 +320,6 @@ export class CustomizeView extends LitElement {
         }
     }
 
-    handleProfileSelect(e) {
-        this.selectedProfile = e.target.value;
-        this.onProfileChange(this.selectedProfile);
-    }
-
     handleLanguageSelect(e) {
         this.selectedLanguage = e.target.value;
         this.onLanguageChange(this.selectedLanguage);
@@ -344,16 +328,6 @@ export class CustomizeView extends LitElement {
     handleImageQualitySelect(e) {
         this.selectedImageQuality = e.target.value;
         this.onImageQualityChange(this.selectedImageQuality);
-    }
-
-    handleLayoutModeSelect(e) {
-        this.layoutMode = e.target.value;
-        this.onLayoutModeChange(this.layoutMode);
-    }
-
-    async handleCustomPromptInput(e) {
-        this.customPrompt = e.target.value;
-        await cheatingDaddy.storage.updatePreference('customPrompt', this.customPrompt);
     }
 
     async handleAudioModeSelect(e) {
@@ -366,19 +340,6 @@ export class CustomizeView extends LitElement {
         this.theme = e.target.value;
         await cheatingDaddy.theme.save(this.theme);
         this.updateBackgroundAppearance();
-        this.requestUpdate();
-    }
-
-    async handleGoogleSearchChange(e) {
-        this.googleSearchEnabled = e.target.checked;
-        await cheatingDaddy.storage.updatePreference('googleSearchEnabled', this.googleSearchEnabled);
-        if (window.menaceElectron) {
-            try {
-                await window.menaceElectron.invoke('update-google-search-setting', this.googleSearchEnabled);
-            } catch (error) {
-                console.error('Failed to notify main process:', error);
-            }
-        }
         this.requestUpdate();
     }
 

@@ -343,96 +343,14 @@ export class AssistantView extends LitElement {
         return this.responses.length > 0 && this.currentResponseIndex >= 0 ? this.responses[this.currentResponseIndex] : null;
     }
 
-    prepareMarkdownContent(content) {
-        if (!content || typeof content !== 'string') {
+    renderMarkdown(content) {
+        const safeMarkdown = globalThis.menaceSafeMarkdown;
+        if (!safeMarkdown) {
             return '';
         }
 
-        let text = content;
-
-        // Normalize spaced bold markers so "** word **" still renders as bold.
-        text = text.replace(/\*\*\s+([^*\n]+?)\s+\*\*/g, '**$1**');
-
-        // During streaming, close an unclosed "**" so partial bold does not show literally.
-        const boldMarkerCount = (text.match(/\*\*/g) || []).length;
-        if (boldMarkerCount % 2 === 1) {
-            text += '**';
-        }
-
-        return text;
-    }
-
-    cleanupRenderedHtml(html) {
-        const parts = html.split(/(<pre[\s\S]*?<\/pre>|<code[\s\S]*?<\/code>)/gi);
-
-        return parts
-            .map((part, index) => {
-                if (index % 2 === 1) {
-                    return part;
-                }
-
-                return part.replace(/\*\*([^*<\n]+?)\*\*/g, '<strong>$1</strong>').replace(/\*\*/g, '');
-            })
-            .join('');
-    }
-
-    fallbackFormatMarkdown(content) {
-        const prepared = this.prepareMarkdownContent(content);
-
-        return prepared
-            .replace(/\*\*([^*\n]+?)\*\*/g, '<strong>$1</strong>')
-            .replace(/\*\*/g, '')
-            .replace(/\n/g, '<br>');
-    }
-
-    renderMarkdown(content) {
-        const prepared = this.prepareMarkdownContent(content);
-
-        if (typeof window !== 'undefined' && window.marked) {
-            try {
-                window.marked.setOptions({
-                    breaks: true,
-                    gfm: true,
-                });
-                let rendered = window.marked.parse(prepared);
-                rendered = this.cleanupRenderedHtml(rendered);
-                rendered = this.wrapWordsInSpans(rendered);
-                return rendered;
-            } catch (error) {
-                console.warn('Error parsing markdown:', error);
-                return this.fallbackFormatMarkdown(content);
-            }
-        }
-
-        return this.fallbackFormatMarkdown(content);
-    }
-
-    wrapWordsInSpans(html) {
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, 'text/html');
-        const tagsToSkip = ['PRE'];
-
-        function wrap(node) {
-            if (node.nodeType === Node.TEXT_NODE && node.textContent.trim() && !tagsToSkip.includes(node.parentNode.tagName)) {
-                const words = node.textContent.split(/(\s+)/);
-                const frag = document.createDocumentFragment();
-                words.forEach(word => {
-                    if (word.trim()) {
-                        const span = document.createElement('span');
-                        span.setAttribute('data-word', '');
-                        span.textContent = word;
-                        frag.appendChild(span);
-                    } else {
-                        frag.appendChild(document.createTextNode(word));
-                    }
-                });
-                node.parentNode.replaceChild(frag, node);
-            } else if (node.nodeType === Node.ELEMENT_NODE && !tagsToSkip.includes(node.tagName)) {
-                Array.from(node.childNodes).forEach(wrap);
-            }
-        }
-        Array.from(doc.body.childNodes).forEach(wrap);
-        return doc.body.innerHTML;
+        const rendered = safeMarkdown.renderSafeMarkdown(content, window.marked);
+        return safeMarkdown.wrapWordsInSpans(rendered);
     }
 
     navigateToPreviousResponse() {

@@ -3,8 +3,18 @@ const { BrowserWindow, ipcMain } = require('electron');
 const { spawn } = require('child_process');
 const { saveDebugAudio } = require('../audioUtils');
 const { getSystemPrompt } = require('./prompts');
-const { getAvailableModel, incrementLimitCount, getApiKey, incrementCharUsage, getConfig } = require('../storage');
-const { getEffectiveOpenRouterApiKey } = require('./openrouterCredentials');
+const {
+    getAvailableModel,
+    incrementLimitCount,
+    getApiKey,
+    incrementCharUsage,
+    getConfig,
+    getPreferences,
+    updatePreference,
+    getCredentials,
+} = require('../storage');
+const { getOpenRouterAccess, getUserOpenRouterApiKey } = require('./openrouterCredentials');
+const { streamHostedChatCompletion } = require('./hostedAiClient');
 const polar = require('./polar');
 const { connectCloud, sendCloudAudio, sendCloudText, sendCloudImage, closeCloud, isCloudActive, setOnTurnComplete } = require('./cloud');
 const { startTransportLog, logTransportEvent, closeTransportLog } = require('./transportLogger');
@@ -163,14 +173,15 @@ function getCurrentSessionData() {
     };
 }
 
+function isGoogleSearchEnabled() {
+    const prefs = getPreferences();
+    return Boolean(prefs.googleSearchEnabled);
+}
+
 async function getEnabledTools() {
     const tools = [];
 
-    // Check if Google Search is enabled (default: true)
-    const googleSearchEnabled = await getStoredSetting('googleSearchEnabled', 'true');
-    console.log('Google Search enabled:', googleSearchEnabled);
-
-    if (googleSearchEnabled === 'true') {
+    if (isGoogleSearchEnabled()) {
         tools.push({ googleSearch: {} });
         console.log('Added Google Search tool');
     } else {
@@ -180,42 +191,16 @@ async function getEnabledTools() {
     return tools;
 }
 
-async function getStoredSetting(key, defaultValue) {
-    try {
-        const windows = BrowserWindow.getAllWindows();
-        if (windows.length > 0) {
-            // Wait a bit for the renderer to be ready
-            await new Promise(resolve => setTimeout(resolve, 100));
-
-            // Try to get setting from renderer process localStorage
-            const value = await windows[0].webContents.executeJavaScript(`
-                (function() {
-                    try {
-                        if (typeof localStorage === 'undefined') {
-                            console.log('localStorage not available yet for ${key}');
-                            return '${defaultValue}';
-                        }
-                        const stored = localStorage.getItem('${key}');
-                        console.log('Retrieved setting ${key}:', stored);
-                        return stored || '${defaultValue}';
-                    } catch (e) {
-                        console.error('Error accessing localStorage for ${key}:', e);
-                        return '${defaultValue}';
-                    }
-                })()
-            `);
-            return value;
-        }
-    } catch (error) {
-        console.error('Error getting stored setting for', key, ':', error.message);
-    }
-    console.log('Using default value for', key, ':', defaultValue);
-    return defaultValue;
+function canRouteAnswersViaOpenRouter() {
+    return getOpenRouterAccess().available;
 }
 
 function hasOpenRouterKey() {
-    const key = getEffectiveOpenRouterApiKey();
-    return Boolean(key && key.trim());
+    return canRouteAnswersViaOpenRouter();
+}
+
+function usesHostedAnswerGateway() {
+    return getOpenRouterAccess().source === 'hosted';
 }
 
 async function ensureLicensedSession() {
@@ -320,9 +305,9 @@ async function readOpenRouterSseStream(response, eventPrefix, onDisplayText) {
 }
 
 async function sendToOpenRouter(transcription) {
-    const openRouterApiKey = getEffectiveOpenRouterApiKey();
-    if (!openRouterApiKey) {
-        console.log('No OpenRouter API key configured, skipping OpenRouter response');
+    const access = getOpenRouterAccess();
+    if (!access.available) {
+        console.log('No OpenRouter or hosted gateway access configured, skipping answer routing');
         return;
     }
 
@@ -334,10 +319,11 @@ async function sendToOpenRouter(transcription) {
     const config = getConfig();
     const modelToUse = config.openrouterModel;
 
-    console.log(`Sending to OpenRouter (${modelToUse}):`, transcription.substring(0, 100) + '...');
+    console.log(`Sending answer request (${modelToUse}, ${access.source}):`, transcription.substring(0, 100) + '...');
     logTransportEvent('openrouter.text.request', {
         model: modelToUse,
         transcription,
+        source: access.source,
     });
 
     answerConversationHistory.push({
@@ -349,42 +335,66 @@ async function sendToOpenRouter(transcription) {
         answerConversationHistory = answerConversationHistory.slice(-20);
     }
 
+    const messages = [{ role: 'system', content: currentSystemPrompt || 'You are a helpful assistant.' }, ...answerConversationHistory];
+
     try {
-        const response = await fetch(OPENROUTER_API_URL, {
-            method: 'POST',
-            headers: {
-                Authorization: `Bearer ${openRouterApiKey}`,
-                'Content-Type': 'application/json',
-                'HTTP-Referer': 'https://openrouter.ai',
-                'X-OpenRouter-Title': 'menace-agent',
-            },
-            body: JSON.stringify({
+        let fullText = '';
+        let finishReason = 'stop';
+
+        if (usesHostedAnswerGateway()) {
+            const hostedResult = await streamHostedChatCompletion({
                 model: modelToUse,
-                messages: [{ role: 'system', content: currentSystemPrompt || 'You are a helpful assistant.' }, ...answerConversationHistory],
-                stream: true,
-                temperature: 0.7,
-                max_tokens: OPENROUTER_MAX_TOKENS,
-            }),
-        });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('OpenRouter API error:', response.status, errorText);
-            logTransportEvent('openrouter.text.http_error', {
-                status: response.status,
-                body: errorText,
+                messages,
+                onToken: (displayText, isFirst) => {
+                    sendToRenderer(isFirst ? 'new-response' : 'update-response', displayText);
+                },
             });
-            sendToRenderer('update-status', `OpenRouter error: ${response.status}`);
-            return;
+            fullText = hostedResult.fullText;
+            finishReason = hostedResult.finishReason;
+        } else {
+            const openRouterApiKey = getUserOpenRouterApiKey();
+            if (!openRouterApiKey) {
+                return;
+            }
+
+            const response = await fetch(OPENROUTER_API_URL, {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${openRouterApiKey}`,
+                    'Content-Type': 'application/json',
+                    'HTTP-Referer': 'https://openrouter.ai',
+                    'X-OpenRouter-Title': 'menace-agent',
+                },
+                body: JSON.stringify({
+                    model: modelToUse,
+                    messages,
+                    stream: true,
+                    temperature: 0.7,
+                    max_tokens: OPENROUTER_MAX_TOKENS,
+                }),
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('OpenRouter API error:', response.status, errorText);
+                logTransportEvent('openrouter.text.http_error', {
+                    status: response.status,
+                    body: errorText,
+                });
+                sendToRenderer('update-status', `OpenRouter error: ${response.status}`);
+                return;
+            }
+
+            logTransportEvent('openrouter.text.http_response', {
+                status: response.status,
+            });
+
+            const streamResult = await readOpenRouterSseStream(response, 'openrouter.text', (displayText, isFirst) => {
+                sendToRenderer(isFirst ? 'new-response' : 'update-response', displayText);
+            });
+            fullText = streamResult.fullText;
+            finishReason = streamResult.finishReason;
         }
-
-        logTransportEvent('openrouter.text.http_response', {
-            status: response.status,
-        });
-
-        const { fullText, finishReason } = await readOpenRouterSseStream(response, 'openrouter.text', (displayText, isFirst) => {
-            sendToRenderer(isFirst ? 'new-response' : 'update-response', displayText);
-        });
 
         const cleanedResponse = stripThinkingTags(fullText);
         const modelKey = modelToUse.split('/').pop();
@@ -911,8 +921,8 @@ async function sendAudioToGemini(base64Data, geminiSessionRef) {
 }
 
 async function sendImageToOpenRouter(base64Data, prompt) {
-    const openRouterApiKey = getEffectiveOpenRouterApiKey();
-    if (!openRouterApiKey) {
+    const access = getOpenRouterAccess();
+    if (!access.available) {
         return {
             success: false,
             error: 'Screen context is unavailable. Use a pass with included AI, or add a Gemini API key on the home screen.',
@@ -920,10 +930,45 @@ async function sendImageToOpenRouter(base64Data, prompt) {
     }
 
     const model = OPENROUTER_VISION_MODEL;
+    const messages = [
+        { role: 'system', content: currentSystemPrompt || 'You are a helpful assistant.' },
+        {
+            role: 'user',
+            content: [
+                { type: 'text', text: prompt },
+                {
+                    type: 'image_url',
+                    image_url: { url: `data:image/jpeg;base64,${base64Data}` },
+                },
+            ],
+        },
+    ];
 
     try {
-        console.log(`Sending image to OpenRouter (${model}, streaming)...`);
-        logTransportEvent('openrouter.vision.request', { model, prompt });
+        console.log(`Sending image answer request (${model}, ${access.source}, streaming)...`);
+        logTransportEvent('openrouter.vision.request', { model, prompt, source: access.source });
+
+        if (usesHostedAnswerGateway()) {
+            let fullText = '';
+            const hostedResult = await streamHostedChatCompletion({
+                model,
+                messages,
+                onToken: (displayText, isFirst) => {
+                    fullText = displayText;
+                    sendToRenderer(isFirst ? 'new-response' : 'update-response', displayText);
+                },
+            });
+            fullText = hostedResult.fullText || fullText;
+            if (fullText.trim()) {
+                saveScreenAnalysis(prompt, fullText, model);
+            }
+            return { success: true, model };
+        }
+
+        const openRouterApiKey = getUserOpenRouterApiKey();
+        if (!openRouterApiKey) {
+            return { success: false, error: 'OpenRouter key required for screen context.' };
+        }
 
         const response = await fetch(OPENROUTER_API_URL, {
             method: 'POST',
@@ -935,19 +980,7 @@ async function sendImageToOpenRouter(base64Data, prompt) {
             },
             body: JSON.stringify({
                 model,
-                messages: [
-                    { role: 'system', content: currentSystemPrompt || 'You are a helpful assistant.' },
-                    {
-                        role: 'user',
-                        content: [
-                            { type: 'text', text: prompt },
-                            {
-                                type: 'image_url',
-                                image_url: { url: `data:image/jpeg;base64,${base64Data}` },
-                            },
-                        ],
-                    },
-                ],
+                messages,
                 stream: true,
                 max_tokens: OPENROUTER_MAX_TOKENS,
             }),
@@ -1041,8 +1074,14 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
     // Store the geminiSessionRef globally for reconnection access
     global.geminiSessionRef = geminiSessionRef;
 
-    ipcMain.handle('initialize-cloud', async (event, token, profile, userContext) => {
+    ipcMain.handle('initialize-cloud', async (event, profile, userContext) => {
         if (!(await ensureLicensedSession())) {
+            return false;
+        }
+
+        const token = getCredentials().cloudToken || '';
+        if (!token.trim()) {
+            sendToRenderer('update-status', 'Cloud token not configured.');
             return false;
         }
 
@@ -1064,8 +1103,14 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
         }
     });
 
-    ipcMain.handle('initialize-gemini', async (event, apiKey, customPrompt, profile = 'sales', language = 'en-US') => {
+    ipcMain.handle('initialize-gemini', async (event, customPrompt, profile = 'sales', language = 'en-US') => {
         if (!(await ensureLicensedSession())) {
+            return false;
+        }
+
+        const apiKey = getApiKey();
+        if (!apiKey || !apiKey.trim()) {
+            sendToRenderer('update-status', 'Add your Gemini API key on the home screen.');
             return false;
         }
 
@@ -1372,9 +1417,8 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
 
     ipcMain.handle('update-google-search-setting', async (event, enabled) => {
         try {
-            console.log('Google Search setting updated to:', enabled);
-            // The setting is already saved in localStorage by the renderer
-            // This is just for logging/confirmation
+            updatePreference('googleSearchEnabled', Boolean(enabled));
+            console.log('Google Search setting updated to:', Boolean(enabled));
             return { success: true };
         } catch (error) {
             console.error('Error updating Google Search setting:', error);
@@ -1386,7 +1430,7 @@ function setupGeminiIpcHandlers(geminiSessionRef) {
 module.exports = {
     initializeGeminiSession,
     getEnabledTools,
-    getStoredSetting,
+    isGoogleSearchEnabled,
     sendToRenderer,
     initializeNewSession,
     saveConversationTurn,
