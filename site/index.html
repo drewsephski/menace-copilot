@@ -6,6 +6,7 @@
     <meta name="description" content="Menace Agent — live conversation copilot for macOS. Real-time objection handling with context from the conversation and your screen." />
     <title>Menace Agent — Live conversation copilot for macOS</title>
     <link rel="icon" href="/logo.png" type="image/png" />
+    <link rel="stylesheet" href="/premium.css" />
     <style>
         :root {
             color-scheme: dark;
@@ -1072,11 +1073,18 @@
             .plan-detail-list { grid-template-columns: 1fr; }
             .pricing-shell-head,
             .pricing-shell-body { padding-left: 20px; padding-right: 20px; }
-            .site-nav .nav-link { display: none; }
         }
     </style>
 </head>
 <body>
+    <svg aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden">
+        <filter id="menace-grain">
+            <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch" />
+            <feColorMatrix type="saturate" values="0" />
+        </filter>
+    </svg>
+    <div class="hood-parallax" data-hood-parallax aria-hidden="true"></div>
+    <div class="hood-grain" aria-hidden="true"></div>
     <div class="hood-bg" aria-hidden="true"></div>
     <div class="page">
         <header class="site-header">
@@ -1090,9 +1098,64 @@
                     <a class="nav-link" href="#pricing">Pricing</a>
                     <a class="nav-link" href="mailto:drewsepeczi@gmail.com">Support</a>
                     <a class="nav-cta" href="#pricing">Get access</a>
+                    <button type="button" class="sterling-menu-btn" data-sterling-toggle aria-expanded="false" aria-controls="sterling-menu" aria-label="Open menu">
+                        <span class="btn-label-stack" aria-hidden="true">
+                            <span>Menu</span>
+                            <span>Close</span>
+                        </span>
+                        <svg class="menu-icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                            <path d="M7.33 16V0h1.34v16H7.33z" fill="currentColor" />
+                            <path d="M16 8.67H0V7.33h16v1.34z" fill="currentColor" />
+                        </svg>
+                    </button>
                 </nav>
             </div>
         </header>
+
+        <div class="sterling-overlay" data-sterling-overlay id="sterling-menu" aria-hidden="true">
+            <div class="sterling-panels" aria-hidden="true">
+                <div class="sterling-panel"></div>
+                <div class="sterling-panel"></div>
+                <div class="sterling-panel"></div>
+            </div>
+            <div class="sterling-overlay-backdrop" tabindex="-1"></div>
+            <nav class="sterling-menu" aria-label="Main">
+                <div class="sterling-shape-field" aria-hidden="true">
+                    <div class="sterling-shape sterling-shape-1" data-sterling-shape="1"></div>
+                    <div class="sterling-shape sterling-shape-2" data-sterling-shape="2"></div>
+                    <div class="sterling-shape sterling-shape-3" data-sterling-shape="3"></div>
+                </div>
+                <ul class="sterling-menu-list">
+                    <li class="sterling-menu-item" data-sterling-shape-target="1">
+                        <a class="sterling-menu-link" href="#how">
+                            <span class="sterling-menu-link-text">How it works</span>
+                            <span class="sterling-menu-link-hover" aria-hidden="true"></span>
+                        </a>
+                    </li>
+                    <li class="sterling-menu-item" data-sterling-shape-target="2">
+                        <a class="sterling-menu-link" href="#pricing">
+                            <span class="sterling-menu-link-text">Pricing</span>
+                            <span class="sterling-menu-link-hover" aria-hidden="true"></span>
+                        </a>
+                    </li>
+                    <li class="sterling-menu-item" data-sterling-shape-target="3">
+                        <a class="sterling-menu-link" href="#demo">
+                            <span class="sterling-menu-link-text">Watch demo</span>
+                            <span class="sterling-menu-link-hover" aria-hidden="true"></span>
+                        </a>
+                    </li>
+                    <li class="sterling-menu-item">
+                        <a class="sterling-menu-link" href="mailto:drewsepeczi@gmail.com">
+                            <span class="sterling-menu-link-text">Support</span>
+                            <span class="sterling-menu-link-hover" aria-hidden="true"></span>
+                        </a>
+                    </li>
+                </ul>
+                <div class="sterling-menu-cta">
+                    <a class="btn btn-primary" href="#pricing">Get access</a>
+                </div>
+            </nav>
+        </div>
 
         <main>
             <section class="hero">
@@ -1102,7 +1165,9 @@
                             <span class="tally lit" aria-hidden="true"></span>
                             <span class="eyebrow-label">Live conversation copilot</span>
                         </div>
-                        <h1>Know what to say next.</h1>
+                        <h1 class="text-reveal" aria-label="Know what to say next.">
+                            <span class="char" style="--i:0">K</span><span class="char" style="--i:1">n</span><span class="char" style="--i:2">o</span><span class="char" style="--i:3">w</span><span class="char" style="--i:4">&nbsp;</span><span class="char" style="--i:5">w</span><span class="char" style="--i:6">h</span><span class="char" style="--i:7">a</span><span class="char" style="--i:8">t</span><span class="char" style="--i:9">&nbsp;</span><span class="char" style="--i:10">t</span><span class="char" style="--i:11">o</span><span class="char" style="--i:12">&nbsp;</span><span class="char" style="--i:13">s</span><span class="char" style="--i:14">a</span><span class="char" style="--i:15">y</span><span class="char" style="--i:16">&nbsp;</span><span class="char" style="--i:17">n</span><span class="char" style="--i:18">e</span><span class="char" style="--i:19">x</span><span class="char" style="--i:20">t</span><span class="char" style="--i:21">.</span>
+                        </h1>
                         <p class="hero-lead">
                             Menace listens to the conversation, understands what's on screen, and gives you concise, ready-to-say responses in real time.
                         </p>
@@ -1170,15 +1235,23 @@
                         <span class="eyebrow-label">Product demo · 60–90 sec</span>
                     </div>
                     <div class="demo-frame" data-demo-frame>
-                        <!-- Replace placeholder with: <video src="/demo.mp4" controls playsinline poster="/demo-poster.jpg"></video> and add class "has-video" to .demo-frame -->
-                        <div class="demo-frame-inner">
-                            <div class="demo-play" aria-hidden="true">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                        <video
+                            data-demo-video
+                            src="/demo.mp4"
+                            poster="/logo.png"
+                            controls
+                            playsinline
+                            preload="metadata"
+                            hidden
+                        ></video>
+                        <div class="demo-frame-inner" data-demo-placeholder>
+                            <button type="button" class="demo-play-btn" data-demo-play aria-label="Play product demo">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                                     <path d="M8 5v14l11-7L8 5z" />
                                 </svg>
-                            </div>
+                            </button>
                             <p class="demo-frame-title">See Menace on a live call</p>
-                            <p class="demo-frame-note">Demo recording coming soon. Drop a video element here — no layout changes needed.</p>
+                            <p class="demo-frame-note" data-demo-note>Add <code>site/demo.mp4</code> to enable playback — no layout changes needed.</p>
                         </div>
                     </div>
                 </div>
@@ -1191,45 +1264,64 @@
                             <span class="tally" aria-hidden="true"></span>
                             <span class="eyebrow-label">Pipeline</span>
                         </div>
-                        <h2>Listen. Watch. Speak.</h2>
+                        <h2 data-block-reveal>
+                            <span class="block-reveal-line">
+                                <span class="block-reveal-text">Listen. Watch. Speak.</span>
+                                <span class="block-reveal-wipe" aria-hidden="true"></span>
+                            </span>
+                        </h2>
                         <p>Setup lives in a normal Mac window. The live session collapses into a compact always-on-top prompter — not another dashboard fighting for attention.</p>
                     </div>
-                    <div class="plates interactive" data-reveal>
-                        <article class="plate" data-plate tabindex="0">
-                            <span class="plate-step" aria-hidden="true">01</span>
-                            <div class="plate-icon" aria-hidden="true">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                                    <path d="M12 1a4 4 0 0 1 4 4v6a4 4 0 0 1-8 0V5a4 4 0 0 1 4-4Z" stroke="currentColor" stroke-width="1.75" />
-                                    <path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4M8 22h8" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" />
+                    <div class="bento-section" data-reveal>
+                        <div class="bento-lens-card" data-bento-lens>
+                            <div class="bento-lens-viewport" data-bento-viewport aria-label="Explore use cases — drag the lens to magnify">
+                                <div class="bento-tag-rows" data-bento-base></div>
+                                <div class="bento-tag-rows bento-tag-reveal-layer" data-bento-reveal></div>
+                                <svg class="bento-lens" data-bento-lens-handle viewBox="0 0 92 92" aria-hidden="true">
+                                    <circle cx="36" cy="36" r="28" fill="rgba(26,26,26,0.9)" stroke="rgba(247,247,242,0.2)" stroke-width="2" />
+                                    <path d="M56 56 L78 78" stroke="rgba(247,247,242,0.35)" stroke-width="6" stroke-linecap="round" />
+                                    <circle cx="36" cy="36" r="22" fill="none" stroke="rgba(196,30,58,0.4)" stroke-width="1.5" />
                                 </svg>
                             </div>
-                            <div class="plate-tag">Whisper</div>
-                            <h3>Listen on-device</h3>
-                            <p>Speech-to-text runs locally on your Mac. Raw audio stays on-device; transcript text is sent to your selected AI provider for answers.</p>
-                        </article>
-                        <article class="plate" data-plate tabindex="0">
-                            <span class="plate-step" aria-hidden="true">02</span>
-                            <div class="plate-icon" aria-hidden="true">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                                    <rect x="3" y="4" width="18" height="13" rx="2" stroke="currentColor" stroke-width="1.75" />
-                                    <path d="M8 21h8M12 17v4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" />
-                                </svg>
+                            <div class="bento-lens-copy">
+                                <h3>Use cases in focus</h3>
+                                <p>Drag the lens across live conversation modes — sales, meetings, interviews, and more.</p>
                             </div>
-                            <div class="plate-tag">Screen</div>
-                            <h3>Read the room</h3>
-                            <p>Screen capture adds deck slides, docs, and context from what’s actually in front of you.</p>
-                        </article>
-                        <article class="plate" data-plate tabindex="0">
-                            <span class="plate-step" aria-hidden="true">03</span>
-                            <div class="plate-icon" aria-hidden="true">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                                    <path d="M4 6h16M4 12h10M4 18h14" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" />
-                                </svg>
-                            </div>
-                            <div class="plate-tag">Overlay</div>
-                            <h3>Ready-to-say responses</h3>
-                            <p>Real-time objection handling in an always-on-top overlay — stay in Zoom, Meet, or Teams.</p>
-                        </article>
+                        </div>
+                        <div class="bento-features">
+                            <article class="bento-feature span-row" tabindex="0">
+                                <div class="bento-feature-icon" aria-hidden="true">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                        <path d="M12 1a4 4 0 0 1 4 4v6a4 4 0 0 1-8 0V5a4 4 0 0 1 4-4Z" stroke="currentColor" stroke-width="1.75" />
+                                        <path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4M8 22h8" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" />
+                                    </svg>
+                                </div>
+                                <div class="bento-feature-tag">Whisper</div>
+                                <h3>Listen on-device</h3>
+                                <p>Speech-to-text runs locally on your Mac. Raw audio stays on-device; transcript text is sent to your selected AI provider for answers.</p>
+                            </article>
+                            <article class="bento-feature" tabindex="0">
+                                <div class="bento-feature-icon" aria-hidden="true">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                        <rect x="3" y="4" width="18" height="13" rx="2" stroke="currentColor" stroke-width="1.75" />
+                                        <path d="M8 21h8M12 17v4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" />
+                                    </svg>
+                                </div>
+                                <div class="bento-feature-tag">Screen</div>
+                                <h3>Read the room</h3>
+                                <p>Screen capture adds deck slides, docs, and context from what's actually in front of you.</p>
+                            </article>
+                            <article class="bento-feature" tabindex="0">
+                                <div class="bento-feature-icon" aria-hidden="true">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                        <path d="M4 6h16M4 12h10M4 18h14" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" />
+                                    </svg>
+                                </div>
+                                <div class="bento-feature-tag">Overlay</div>
+                                <h3>Ready-to-say responses</h3>
+                                <p>Real-time objection handling in an always-on-top overlay — stay in Zoom, Meet, or Teams.</p>
+                            </article>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -1242,7 +1334,12 @@
                                 <span class="tally lit" aria-hidden="true"></span>
                                 <span class="eyebrow-label">Access</span>
                             </div>
-                            <h2>Pick a pass</h2>
+                            <h2 data-block-reveal>
+                                <span class="block-reveal-line">
+                                    <span class="block-reveal-text">Pick a pass</span>
+                                    <span class="block-reveal-wipe" aria-hidden="true"></span>
+                                </span>
+                            </h2>
                             <p>90-Day and Monthly include AI answers. BYOK is app-only and uses your own API keys. Select a pass, review what's included, then checkout in your browser.</p>
                         </div>
 
@@ -1329,6 +1426,8 @@
             </div>
         </footer>
     </div>
-    <script src="/landing.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js" defer></script>
+    <script src="/landing.js" defer></script>
 </body>
 </html>

@@ -23,6 +23,12 @@ const PLANS = {
 
 const PLAN_ORDER = ['search_pass', 'monthly'];
 
+const BENTO_TAGS = [
+    ['Sales calls', 'Objection handling', 'Pipeline reviews', 'Discovery calls', 'Demo day'],
+    ['Meetings', 'Standups', '1:1s', 'Board prep', 'All-hands'],
+    ['Interviews', 'Negotiations', 'Presentations', 'Q&A prep', 'Custom profiles'],
+];
+
 function initPlanPicker() {
     const root = document.querySelector('[data-plan-picker]');
     if (!root) return;
@@ -165,6 +171,10 @@ function initPlanPicker() {
     window.requestAnimationFrame(syncRingForSelection);
 }
 
+function hasGsap() {
+    return typeof window.gsap !== 'undefined' && typeof window.ScrollTrigger !== 'undefined';
+}
+
 function initReveal() {
     const items = document.querySelectorAll('[data-reveal]');
     if (!items.length || !('IntersectionObserver' in window)) {
@@ -186,6 +196,61 @@ function initReveal() {
     items.forEach(item => observer.observe(item));
 }
 
+function initBlockReveal() {
+    const blocks = document.querySelectorAll('[data-block-reveal]');
+    if (!blocks.length) return;
+
+    if (hasGsap()) {
+        const { gsap, ScrollTrigger } = window;
+        gsap.registerPlugin(ScrollTrigger);
+
+        blocks.forEach(block => {
+            const text = block.querySelector('.block-reveal-text');
+            const wipe = block.querySelector('.block-reveal-wipe');
+            if (!text || !wipe) return;
+
+            block.classList.add('gsap-ready');
+            gsap.set(text, { opacity: 0, yPercent: 100 });
+            gsap.set(wipe, { scaleX: 0, transformOrigin: 'left center' });
+
+            gsap
+                .timeline({
+                    scrollTrigger: {
+                        trigger: block,
+                        start: 'top 85%',
+                        once: true,
+                    },
+                })
+                .to(wipe, { scaleX: 1, duration: 0.55, ease: 'expo.inOut' })
+                .to(text, { opacity: 1, yPercent: 0, duration: 0.5, ease: 'expo.out' }, '-=0.28')
+                .to(wipe, { scaleX: 0, transformOrigin: 'right center', duration: 0.5, ease: 'expo.inOut' }, '+=0.12');
+        });
+        return;
+    }
+
+    if (!('IntersectionObserver' in window)) {
+        blocks.forEach(block => {
+            block.classList.add('is-visible');
+            window.setTimeout(() => block.classList.add('wipe-out'), 900);
+        });
+        return;
+    }
+
+    const observer = new IntersectionObserver(
+        entries => {
+            entries.forEach(entry => {
+                if (!entry.isIntersecting) return;
+                entry.target.classList.add('is-visible');
+                window.setTimeout(() => entry.target.classList.add('wipe-out'), 900);
+                observer.unobserve(entry.target);
+            });
+        },
+        { threshold: 0.12, rootMargin: '0px 0px -40px 0px' }
+    );
+
+    blocks.forEach(block => observer.observe(block));
+}
+
 function initPlateFocus() {
     const plates = document.querySelectorAll('[data-plate]');
     plates.forEach(plate => {
@@ -198,8 +263,307 @@ function initPlateFocus() {
     });
 }
 
+function initParallax() {
+    const layer = document.querySelector('[data-hood-parallax]');
+    if (!layer || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    let targetX = 0;
+    let targetY = 0;
+    let currentX = 0;
+    let currentY = 0;
+
+    function handleMove(event) {
+        const x = (event.clientX / window.innerWidth - 0.5) * 2;
+        const y = (event.clientY / window.innerHeight - 0.5) * 2;
+        targetX = x * 12;
+        targetY = y * 8;
+    }
+
+    function tick() {
+        currentX += (targetX - currentX) * 0.06;
+        currentY += (targetY - currentY) * 0.06;
+        layer.style.transform = `translate3d(${currentX}px, ${currentY}px, 0)`;
+        window.requestAnimationFrame(tick);
+    }
+
+    window.addEventListener('pointermove', handleMove, { passive: true });
+    window.requestAnimationFrame(tick);
+}
+
+function initSterlingNav() {
+    const btn = document.querySelector('[data-sterling-toggle]');
+    const overlay = document.querySelector('[data-sterling-overlay]');
+    const backdrop = overlay?.querySelector('.sterling-overlay-backdrop');
+    const panels = overlay ? [...overlay.querySelectorAll('.sterling-panel')] : [];
+    const linkTexts = overlay ? [...overlay.querySelectorAll('.sterling-menu-link-text')] : [];
+    const cta = overlay?.querySelector('.sterling-menu-cta');
+    const links = overlay ? [...overlay.querySelectorAll('.sterling-menu-link')] : [];
+    const shapeItems = overlay ? [...overlay.querySelectorAll('[data-sterling-shape-target]')] : [];
+    const shapes = overlay ? [...overlay.querySelectorAll('[data-sterling-shape]')] : [];
+
+    if (!btn || !overlay) return;
+
+    let menuOpen = false;
+    let menuTimeline = null;
+    const useGsap = hasGsap();
+
+    if (useGsap) {
+        overlay.classList.add('use-gsap');
+        const { gsap } = window;
+        gsap.set(overlay, { autoAlpha: 0, pointerEvents: 'none' });
+        gsap.set(panels, { xPercent: 101 });
+        gsap.set(backdrop, { autoAlpha: 0 });
+        gsap.set(linkTexts, { yPercent: 110, rotate: 4, opacity: 0 });
+        if (cta) gsap.set(cta, { y: 24, opacity: 0 });
+    }
+
+    function activateShape(index) {
+        shapes.forEach(shape => {
+            shape.classList.toggle('is-active', shape.getAttribute('data-sterling-shape') === index);
+        });
+    }
+
+    shapeItems.forEach(item => {
+        const index = item.getAttribute('data-sterling-shape-target');
+        item.addEventListener('mouseenter', () => activateShape(index));
+        item.addEventListener('focusin', () => activateShape(index));
+        item.addEventListener('mouseleave', () => shapes.forEach(shape => shape.classList.remove('is-active')));
+        item.addEventListener('focusout', () => shapes.forEach(shape => shape.classList.remove('is-active')));
+    });
+
+    function setOpen(open) {
+        menuOpen = open;
+        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        overlay.setAttribute('aria-hidden', open ? 'false' : 'true');
+        document.body.style.overflow = open ? 'hidden' : '';
+
+        if (useGsap) {
+            const { gsap } = window;
+            menuTimeline?.kill();
+
+            if (open) {
+                overlay.classList.add('is-open');
+                menuTimeline = gsap.timeline();
+                menuTimeline
+                    .set(overlay, { autoAlpha: 1, pointerEvents: 'auto' })
+                    .to(backdrop, { autoAlpha: 1, duration: 0.4, ease: 'power2.out' }, 0)
+                    .to(panels, { xPercent: 0, duration: 0.55, stagger: 0.08, ease: 'expo.inOut' }, 0)
+                    .to(linkTexts, { yPercent: 0, rotate: 0, opacity: 1, duration: 0.65, stagger: 0.06, ease: 'expo.out' }, 0.2);
+                if (cta) {
+                    menuTimeline.to(cta, { y: 0, opacity: 1, duration: 0.5, ease: 'expo.out' }, 0.35);
+                }
+            } else {
+                menuTimeline = gsap.timeline({
+                    onComplete: () => overlay.classList.remove('is-open'),
+                });
+                menuTimeline
+                    .to(linkTexts, { yPercent: 80, opacity: 0, duration: 0.25, stagger: 0.03, ease: 'power2.in' })
+                    .to(cta, { y: 16, opacity: 0, duration: 0.2, ease: 'power2.in' }, '<')
+                    .to(backdrop, { autoAlpha: 0, duration: 0.35, ease: 'power2.in' }, 0.05)
+                    .to(panels, { xPercent: 101, duration: 0.45, stagger: 0.05, ease: 'expo.in' }, 0.08)
+                    .set(overlay, { autoAlpha: 0, pointerEvents: 'none' });
+                shapes.forEach(shape => shape.classList.remove('is-active'));
+            }
+            return;
+        }
+
+        overlay.classList.toggle('is-open', open);
+    }
+
+    function closeMenu() {
+        if (menuOpen) setOpen(false);
+    }
+
+    btn.addEventListener('click', () => setOpen(!menuOpen));
+    backdrop?.addEventListener('click', closeMenu);
+    links.forEach(link => link.addEventListener('click', closeMenu));
+
+    window.addEventListener('keydown', event => {
+        if (event.key === 'Escape') closeMenu();
+    });
+}
+
+function initDemoVideo() {
+    const frame = document.querySelector('[data-demo-frame]');
+    const video = frame?.querySelector('[data-demo-video]');
+    const placeholder = frame?.querySelector('[data-demo-placeholder]');
+    const playBtn = frame?.querySelector('[data-demo-play]');
+    const note = frame?.querySelector('[data-demo-note]');
+
+    if (!frame || !video || !placeholder) return;
+
+    let videoReady = false;
+
+    function showVideo() {
+        frame.classList.add('has-video');
+        frame.classList.remove('is-loading');
+        placeholder.hidden = true;
+        video.hidden = false;
+        video.controls = true;
+        video.play().catch(() => {});
+    }
+
+    function markReady() {
+        videoReady = true;
+        frame.classList.add('has-video-ready');
+        if (note) {
+            note.textContent = 'Press play to watch Menace on a live call.';
+        }
+    }
+
+    function markUnavailable() {
+        videoReady = false;
+        frame.classList.remove('has-video-ready', 'is-loading');
+        if (note) {
+            note.innerHTML = 'Add <code>site/demo.mp4</code> to enable playback.';
+        }
+    }
+
+    video.addEventListener('loadedmetadata', markReady);
+    video.addEventListener('canplay', markReady);
+    video.addEventListener('error', markUnavailable);
+
+    playBtn?.addEventListener('click', () => {
+        if (videoReady || video.readyState >= 1) {
+            showVideo();
+            return;
+        }
+
+        frame.classList.add('is-loading');
+        video.load();
+
+        const onReady = () => {
+            video.removeEventListener('canplay', onReady);
+            video.removeEventListener('error', onFail);
+            markReady();
+            showVideo();
+        };
+
+        const onFail = () => {
+            video.removeEventListener('canplay', onReady);
+            video.removeEventListener('error', onFail);
+            markUnavailable();
+        };
+
+        video.addEventListener('canplay', onReady, { once: true });
+        video.addEventListener('error', onFail, { once: true });
+    });
+
+    video.load();
+}
+
+function buildTagRow(tags, className = '') {
+    const tripled = [...tags, ...tags, ...tags];
+    const items = tripled
+        .map(
+            tag => `
+        <span class="bento-tag">
+            <span class="highlight-dot" aria-hidden="true"></span>
+            ${tag}
+        </span>
+    `
+        )
+        .join('');
+    return `<div class="bento-tag-row ${className}">${items}</div>`;
+}
+
+function initMagnifiedBento() {
+    const root = document.querySelector('[data-bento-lens]');
+    if (!root) return;
+
+    const viewport = root.querySelector('[data-bento-viewport]');
+    const baseLayer = root.querySelector('[data-bento-base]');
+    const revealLayer = root.querySelector('[data-bento-reveal]');
+    const lens = root.querySelector('[data-bento-lens-handle]');
+
+    if (!viewport || !baseLayer || !revealLayer || !lens) return;
+
+    baseLayer.innerHTML = BENTO_TAGS.map((row, index) => {
+        const classes = index === 1 ? 'reverse' : index === 2 ? 'slow' : '';
+        return buildTagRow(row, classes);
+    }).join('');
+
+    revealLayer.innerHTML = BENTO_TAGS.map((row, index) => {
+        const classes = index === 1 ? 'reverse' : index === 2 ? 'slow' : '';
+        return buildTagRow(row, classes);
+    }).join('');
+
+    const lensRadius = 44;
+    let lensX = viewport.clientWidth / 2;
+    let lensY = viewport.clientHeight / 2;
+    let isDragging = false;
+
+    function updateLens(x, y) {
+        const rect = viewport.getBoundingClientRect();
+        lensX = Math.max(0, Math.min(rect.width, x));
+        lensY = Math.max(0, Math.min(rect.height, y));
+
+        lens.style.left = `${lensX}px`;
+        lens.style.top = `${lensY}px`;
+        revealLayer.style.clipPath = `circle(${lensRadius}px at ${lensX}px ${lensY}px)`;
+        revealLayer.style.webkitClipPath = `circle(${lensRadius}px at ${lensX}px ${lensY}px)`;
+    }
+
+    function pointerToLocal(event) {
+        const rect = viewport.getBoundingClientRect();
+        return {
+            x: event.clientX - rect.left,
+            y: event.clientY - rect.top,
+        };
+    }
+
+    viewport.addEventListener('pointerenter', () => {
+        lens.classList.remove('is-hidden');
+    });
+
+    viewport.addEventListener('pointerleave', () => {
+        if (!isDragging) lens.classList.add('is-hidden');
+    });
+
+    viewport.addEventListener('pointermove', event => {
+        if (!isDragging && event.pointerType === 'mouse') {
+            const point = pointerToLocal(event);
+            updateLens(point.x, point.y);
+        }
+    });
+
+    viewport.addEventListener('pointerdown', event => {
+        isDragging = true;
+        viewport.classList.add('is-dragging');
+        viewport.setPointerCapture(event.pointerId);
+        const point = pointerToLocal(event);
+        updateLens(point.x, point.y);
+    });
+
+    viewport.addEventListener('pointermove', event => {
+        if (!isDragging) return;
+        const point = pointerToLocal(event);
+        updateLens(point.x, point.y);
+    });
+
+    function endDrag(event) {
+        if (!isDragging) return;
+        isDragging = false;
+        viewport.classList.remove('is-dragging');
+        if (viewport.hasPointerCapture(event.pointerId)) {
+            viewport.releasePointerCapture(event.pointerId);
+        }
+    }
+
+    viewport.addEventListener('pointerup', endDrag);
+    viewport.addEventListener('pointercancel', endDrag);
+
+    updateLens(lensX, lensY);
+    lens.classList.add('is-hidden');
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     initPlanPicker();
     initReveal();
+    initBlockReveal();
     initPlateFocus();
+    initParallax();
+    initSterlingNav();
+    initMagnifiedBento();
+    initDemoVideo();
 });

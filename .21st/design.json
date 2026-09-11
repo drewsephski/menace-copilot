@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "project": {
+    "name": "menace-agent",
+    "productType": "desktop-saas",
+    "stack": ["vanilla-html", "vercel-static"]
+  },
+  "sources": {
+    "tokens": ["DESIGN.md"],
+    "components": ["src/components/ui", "site/premium.css"],
+    "assets": ["src/assets", "site/logo.png"],
+    "instructions": ["DESIGN.md", "PRODUCT.md", "AGENTS.md"]
+  },
+  "design": {
+    "colorMode": "dark",
+    "colors": {
+      "hood": "#0b0b0b",
+      "cream": "#f7f7f2",
+      "tally": "#c41e3a"
+    },
+    "typography": {
+      "display": "SF Pro Text / system-ui",
+      "mono": "SF Mono"
+    },
+    "motion": {
+      "easing": "cubic-bezier(0.65, 0.01, 0.05, 0.99)",
+      "grain": true,
+      "reducedMotion": true
+    },
+    "density": "comfortable"
+  },
+  "components": {
+    "installed": [
+      "premiumLicenseInput",
+      "premiumPlanPicker",
+      "uiButton",
+      "uiConfirmDialog",
+      "uiSelect",
+      "uiToast"
+    ],
+    "preferredPrimitives": [],
+    "patterns": [
+      "halide-topo-hero",
+      "text-reveal",
+      "text-block-animation",
+      "sterling-gate-kinetic-navigation",
+      "magnified-bento"
+    ]
+  },
+  "constraints": {
+    "must": [
+      "Keep Menace hood/cream/tally tokens",
+      "Preserve prompter mock and plan picker",
+      "Vanilla HTML/CSS/JS on site/"
+    ],
+    "avoid": ["Generic purple SaaS gradients", "Fabricated social proof"]
+  },
+  "decisions": [
+    {
+      "id": "landing-direction-a-plus",
+      "date": "2026-09-10",
+      "direction": "Broadcast Autocue + Sterling Nav + Magnified Bento",
+      "rationale": "User selected Direction A with Sterling Gate navigation and Magnified Bento feature showcase. Ported 21st patterns to vanilla site/premium.css + landing.js.",
+      "references": [
+        "21st:9993 halide-topo-hero",
+        "21st:9982 text-reveal",
+        "21st:9902 text-block-animation",
+        "21st:10003 sterling-gate-kinetic-navigation",
+        "21st:10470 magnified-bento"
+      ]
+    },
+    {
+      "id": "landing-premium-polish",
+      "date": "2026-09-10",
+      "direction": "Sterling desktop + GSAP block-wipe + demo video wiring",
+      "rationale": "Sterling nav on all breakpoints with GSAP open/close. ScrollTrigger block wipes on section headings. Demo frame auto-detects site/demo.mp4."
+    }
+  ],
+  "evidence": [
+    { "fact": "components.installed", "source": "src/components/ui" },
+    { "fact": "landing.premium", "source": "site/premium.css" },
+    { "fact": "project.instructions", "source": "DESIGN.md" }
+  ],
+  "generatedAt": "2026-09-10T20:55:00.000Z"
+}
