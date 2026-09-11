@@ -10,31 +10,29 @@ const {
     clampMaxTokens,
 } = require('./gatewayConfig');
 
-function messageContentLength(content) {
+function measureMessageContent(content) {
     if (typeof content === 'string') {
-        return content.length;
+        return { textChars: content.length, imageChars: 0 };
     }
 
     if (!Array.isArray(content)) {
-        return 0;
+        return { textChars: 0, imageChars: 0 };
     }
 
-    let total = 0;
+    let textChars = 0;
+    let imageChars = 0;
     for (const part of content) {
         if (!part || typeof part !== 'object') {
             continue;
         }
         if (part.type === 'text' && typeof part.text === 'string') {
-            total += part.text.length;
+            textChars += part.text.length;
         }
         if (part.type === 'image_url' && typeof part.image_url?.url === 'string') {
-            total += part.image_url.url.length;
-            if (part.image_url.url.length > MAX_IMAGE_CHARS) {
-                return MAX_IMAGE_CHARS + 1;
-            }
+            imageChars += part.image_url.url.length;
         }
     }
-    return total;
+    return { textChars, imageChars };
 }
 
 function validateChatRequest(body) {
@@ -50,7 +48,8 @@ function validateChatRequest(body) {
         return { ok: false, status: 400, error: 'Too many messages' };
     }
 
-    let totalChars = 0;
+    let totalTextChars = 0;
+    let totalImageChars = 0;
     for (const message of body.messages) {
         if (!message || typeof message !== 'object') {
             return { ok: false, status: 400, error: 'Invalid message entry' };
@@ -61,14 +60,23 @@ function validateChatRequest(body) {
             return { ok: false, status: 400, error: 'Unsupported message role' };
         }
 
-        const length = messageContentLength(message.content);
-        if (length > MAX_MESSAGE_CHARS) {
+        const { textChars, imageChars } = measureMessageContent(message.content);
+
+        if (imageChars > MAX_IMAGE_CHARS) {
+            return { ok: false, status: 400, error: 'Image too large' };
+        }
+        if (textChars > MAX_MESSAGE_CHARS) {
             return { ok: false, status: 400, error: 'Message too large' };
         }
-        totalChars += length;
+
+        totalTextChars += textChars;
+        totalImageChars += imageChars;
     }
 
-    if (totalChars > MAX_TOTAL_CHARS) {
+    if (totalTextChars > MAX_TOTAL_CHARS) {
+        return { ok: false, status: 400, error: 'Request payload too large' };
+    }
+    if (totalImageChars > MAX_IMAGE_CHARS) {
         return { ok: false, status: 400, error: 'Request payload too large' };
     }
 

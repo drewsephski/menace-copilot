@@ -11,6 +11,7 @@ const validateChatRequest = require(path.join(
     'lib',
     'validateChatRequest.js'
 )).validateChatRequest;
+const { MAX_IMAGE_CHARS } = require(path.join(__dirname, '..', '..', '..', 'site', 'lib', 'gatewayConfig'));
 
 describe('hosted gateway request validation', () => {
     test('selects production model server-side and clamps unsafe parameters', () => {
@@ -52,5 +53,45 @@ describe('hosted gateway request validation', () => {
         });
         assert.equal(result.ok, false);
         assert.match(result.error, /too large/i);
+    });
+
+    test('accepts vision messages with base64 image payloads', () => {
+        const result = validateChatRequest({
+            messages: [
+                { role: 'system', content: 'You are a helpful assistant.' },
+                {
+                    role: 'user',
+                    content: [
+                        { type: 'text', text: 'What is on this screen?' },
+                        {
+                            type: 'image_url',
+                            image_url: { url: `data:image/jpeg;base64,${'A'.repeat(150_000)}` },
+                        },
+                    ],
+                },
+            ],
+        });
+
+        assert.equal(result.ok, true);
+    });
+
+    test('rejects vision messages when image payload exceeds image limit', () => {
+        const result = validateChatRequest({
+            messages: [
+                {
+                    role: 'user',
+                    content: [
+                        { type: 'text', text: 'Describe this screen' },
+                        {
+                            type: 'image_url',
+                            image_url: { url: `data:image/jpeg;base64,${'A'.repeat(MAX_IMAGE_CHARS + 1)}` },
+                        },
+                    ],
+                },
+            ],
+        });
+
+        assert.equal(result.ok, false);
+        assert.match(result.error, /image too large/i);
     });
 });
