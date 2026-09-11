@@ -13,7 +13,7 @@ Per-license limits are enforced in durable storage (Vercel KV / Upstash Redis):
 
 License keys are never logged. Quota identifiers use a SHA-256 hash of the license key.
 
-If quota storage is unavailable, the gateway returns **503** and does not proxy upstream.
+If quota storage is unavailable, the gateway returns **503** and does not proxy upstream — unless durable quota storage was never configured, in which case the gateway runs in **fail-open** mode for beta (set `MENACE_QUOTA_FAIL_OPEN=0` to enforce strict blocking).
 
 ## Model policy
 

@@ -78,9 +78,25 @@ describe('quotaStore', () => {
         );
     });
 
-    test('fails safely when quota storage is unavailable', async () => {
+    test('allows requests in fail-open mode when quota storage is not configured', async () => {
         delete process.env.KV_REST_API_URL;
         delete process.env.KV_REST_API_TOKEN;
+        delete process.env.MENACE_QUOTA_FAIL_OPEN;
+
+        const result = await quotaStore.checkAndConsumeQuota({
+            licenseKey: 'MENACE_missing_store',
+            messages: [{ role: 'user', content: 'Hello' }],
+            maxTokens: 256,
+        });
+
+        assert.equal(result.allowed, true);
+        assert.equal(result.degraded, true);
+    });
+
+    test('fails safely when quota storage is unavailable and fail-open is disabled', async () => {
+        delete process.env.KV_REST_API_URL;
+        delete process.env.KV_REST_API_TOKEN;
+        process.env.MENACE_QUOTA_FAIL_OPEN = '0';
 
         const result = await quotaStore.checkAndConsumeQuota({
             licenseKey: 'MENACE_missing_store',

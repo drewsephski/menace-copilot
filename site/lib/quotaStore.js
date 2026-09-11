@@ -23,6 +23,33 @@ function getRedisConfig() {
     return { url, token };
 }
 
+function isQuotaStorageConfigured() {
+    return getRedisConfig() !== null;
+}
+
+function isQuotaFailOpenEnabled() {
+    const flag = process.env.MENACE_QUOTA_FAIL_OPEN;
+    if (flag === '1' || flag === 'true') {
+        return true;
+    }
+    if (flag === '0' || flag === 'false') {
+        return false;
+    }
+
+    // Beta default: if durable quota storage was never configured, do not block hosted AI.
+    return !isQuotaStorageConfigured();
+}
+
+function allowWithoutQuotaStorage({ licenseKey, messages, maxTokens }) {
+    return {
+        allowed: true,
+        licenseHash: hashLicenseKey(licenseKey),
+        estimatedTokens: estimateRequestTokens(messages, maxTokens),
+        retryAfterSec: 0,
+        degraded: true,
+    };
+}
+
 async function redisCommand(command) {
     const config = getRedisConfig();
     if (!config) {
@@ -96,6 +123,10 @@ async function checkAndConsumeQuota({ licenseKey, messages, maxTokens }) {
 
     const minuteCount = await redisCommand(['INCR', minuteKey]);
     if (minuteCount.unavailable) {
+        if (isQuotaFailOpenEnabled()) {
+            console.warn('[gateway] quota storage unavailable; allowing request in fail-open mode');
+            return allowWithoutQuotaStorage({ licenseKey, messages, maxTokens });
+        }
         return { allowed: false, reason: 'quota_storage_unavailable', retryAfterSec: 0 };
     }
 
@@ -150,4 +181,6 @@ module.exports = {
     estimateRequestTokens,
     checkAndConsumeQuota,
     getRedisConfig,
+    isQuotaStorageConfigured,
+    isQuotaFailOpenEnabled,
 };
