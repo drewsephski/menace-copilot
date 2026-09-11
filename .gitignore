@@ -92,6 +92,9 @@ typings/
 # Live eval output (generated locally)
 .eval-output/
 
+# Local video production assets (captures, renders, caches)
+videos/
+
 # Electron-Forge
 out/
 .specstory
