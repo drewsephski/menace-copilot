@@ -1,3 +1,4 @@
+import './AppUpdater.js';
 import { html, css, LitElement } from '../../assets/lit-core-2.7.4.min.js';
 import { clickableControlStyles } from '../views/sharedPageStyles.js';
 
@@ -103,30 +104,6 @@ export class AppHeader extends LitElement {
             font-family: var(--font-mono);
         }
 
-        .update-button {
-            -webkit-appearance: none;
-            appearance: none;
-            background: transparent;
-            color: var(--tally);
-            border: 1px solid var(--border);
-            padding: var(--header-button-padding);
-            border-radius: 3px;
-            font-size: var(--header-font-size-small);
-            font-weight: 500;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            transition: all 0.1s ease;
-        }
-
-        .update-button svg {
-            width: 14px;
-            height: 14px;
-        }
-
-        .update-button:hover {
-            background: var(--tally-dim);
-        }
     `,
     ];
 
@@ -141,7 +118,6 @@ export class AppHeader extends LitElement {
         onBackClick: { type: Function },
         onHideToggleClick: { type: Function },
         isClickThrough: { type: Boolean, reflect: true },
-        updateAvailable: { type: Boolean },
     };
 
     constructor() {
@@ -156,40 +132,12 @@ export class AppHeader extends LitElement {
         this.onBackClick = () => {};
         this.onHideToggleClick = () => {};
         this.isClickThrough = false;
-        this.updateAvailable = false;
         this._timerInterval = null;
     }
 
     connectedCallback() {
         super.connectedCallback();
         this._startTimer();
-        this._checkForUpdates();
-    }
-
-    async _checkForUpdates() {
-        try {
-            if (!window.menace) {
-                return;
-            }
-
-            const result = await window.menace.app.checkUpdates();
-            if (!result?.success || !result.data) {
-                return;
-            }
-
-            this.updateAvailable = Boolean(result.data.updateAvailable && result.data.releasePageUrl);
-            this.requestUpdate();
-        } catch (err) {
-            console.log('Update check failed:', err.message);
-        }
-    }
-
-    async _openUpdatePage() {
-        if (!window.menace) {
-            return;
-        }
-
-        await window.menace.app.openUpdate();
     }
 
     disconnectedCallback() {
@@ -290,22 +238,7 @@ export class AppHeader extends LitElement {
                     ${
                         this.currentView === 'main'
                             ? html`
-                                  ${
-                                  this.updateAvailable
-                                      ? html`
-                                            <button class="update-button" @click=${this._openUpdatePage}>
-                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor">
-                                                    <path
-                                                        fill-rule="evenodd"
-                                                        d="M13.836 2.477a.75.75 0 0 1 .75.75v3.182a.75.75 0 0 1-.75.75h-3.182a.75.75 0 0 1 0-1.5h1.37l-.84-.841a4.5 4.5 0 0 0-7.08.932.75.75 0 0 1-1.3-.75 6 6 0 0 1 9.44-1.242l.842.84V3.227a.75.75 0 0 1 .75-.75Zm-.911 7.5A.75.75 0 0 1 13.199 11a6 6 0 0 1-9.44 1.241l-.84-.84v1.371a.75.75 0 0 1-1.5 0V9.591a.75.75 0 0 1 .75-.75H5.35a.75.75 0 0 1 0 1.5H3.98l.841.841a4.5 4.5 0 0 0 7.08-.932.75.75 0 0 1 1.025-.273Z"
-                                                        clip-rule="evenodd"
-                                                    />
-                                                </svg>
-                                                Update available
-                                            </button>
-                                        `
-                                      : ''
-                              }
+                                  <app-updater></app-updater>
                                   <button class="icon-button" @click=${this.onHistoryClick}>
                                       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                                           <path

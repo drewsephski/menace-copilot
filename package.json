@@ -1,8 +1,8 @@
 {
     "name": "menace-agent",
     "productName": "Menace Agent",
-    "version": "1.0.0",
-    "description": "Menace Agent — real-time conversation copilot with OpenRouter and local Whisper",
+    "version": "1.0.1",
+    "description": "Menace Agent \u2014 real-time conversation copilot with OpenRouter and local Whisper",
     "main": "src/index.js",
     "scripts": {
         "start": "node scripts/ensure-macos-audio-helper.js && electron-forge start",
@@ -14,7 +14,7 @@
         "package:macos:forge": "electron-forge package --platform=darwin",
         "beta:macos": "node scripts/beta-release-macos.js",
         "make": "electron-forge make",
-        "make:macos": "npm run beta:macos",
+        "make:macos": "pnpm run beta:macos",
         "install:macos": "node scripts/install-macos-app.js",
         "publish": "electron-forge publish",
         "lint": "node scripts/checks/check-syntax.js",
@@ -58,5 +58,17 @@
         "@electron/fuses": "^1.8.0",
         "@reforged/maker-appimage": "^5.0.0",
         "electron": "^30.0.5"
+    },
+    "packageManager": "pnpm@10.33.2",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/drewsephski/menace-copilot.git"
+    },
+    "pnpm": {
+        "onlyBuiltDependencies": [
+            "electron",
+            "fs-xattr",
+            "macos-alias"
+        ]
     }
 }

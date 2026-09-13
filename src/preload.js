@@ -40,7 +40,8 @@ const INVOKE_CHANNELS = new Set([
     'get-app-version',
     'app:get-session-readiness',
     'app:check-updates',
-    'app:open-update',
+    'app:get-update-status',
+    'app:install-update',
     'quit-application',
     'open-external',
     'window-minimize',
@@ -66,6 +67,7 @@ const INVOKE_CHANNELS = new Set([
 const SEND_CHANNELS = new Set(['update-keybinds', 'view-changed', 'personal-context-modal-changed', 'log-message']);
 
 const ON_CHANNELS = new Set([
+    'app:update-status',
     'new-response',
     'update-response',
     'update-status',
@@ -122,7 +124,8 @@ const menace = {
     app: {
         getVersion: () => invoke('get-app-version'),
         checkUpdates: () => invoke('app:check-updates'),
-        openUpdate: () => invoke('app:open-update'),
+        getUpdateStatus: () => invoke('app:get-update-status'),
+        installUpdate: () => invoke('app:install-update'),
         getSessionReadiness: () => invoke('app:get-session-readiness'),
         quit: () => invoke('quit-application'),
         openExternal: url => invoke('open-external', url),

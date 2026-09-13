@@ -32,7 +32,7 @@ function run(cmd, args, opts = {}) {
         ...opts,
     });
     if (result.status !== 0) {
-        throw new Error(`${cmd} ${args.join(' ')} failed with exit ${result.status}`);
+        throw new Error(`${cmd} failed with exit ${result.status}`);
     }
 }
 
@@ -54,7 +54,7 @@ function requireNotarizeCredentials() {
 
 function packageWithForge() {
     console.log('\n==> Packaging with electron-forge (sign + notarize via forge.config.js)');
-    run('npx', ['electron-forge', 'package', '--platform=darwin', `--arch=${arch}`]);
+    run('pnpm', ['exec', 'electron-forge', 'package', '--platform=darwin', `--arch=${arch}`]);
 }
 
 function packageManual() {
@@ -111,7 +111,7 @@ function verifyPackagedSecrets(appBundle) {
 
 function createDmg() {
     console.log('\n==> Creating DMG from packaged app');
-    run('npx', ['electron-forge', 'make', '--platform=darwin', '--skip-package']);
+    run('pnpm', ['exec', 'electron-forge', 'make', '--platform=darwin', `--arch=${arch}`, '--skip-package']);
 }
 
 function findDmgArtifact() {
@@ -146,6 +146,7 @@ function main() {
         try {
             packageWithForge();
         } catch (error) {
+            if (process.env.CI) throw error;
             console.warn('electron-forge package failed, falling back to manual package + notarytool:', error.message);
             packageManual();
             notarizeAndStaple(appPath);
@@ -172,11 +173,15 @@ function main() {
     }
 
     const notarizedArtifact = path.resolve(appPath);
+    fs.rmSync(path.join(projectRoot, 'out', 'make'), { recursive: true, force: true });
     createDmg();
     const dmgPath = findDmgArtifact();
+    if (!dmgPath) throw new Error('Release DMG is missing');
+    run('hdiutil', ['verify', dmgPath]);
+    run(process.execPath, [path.join(__dirname, 'stage-macos-release.js')]);
 
     console.log('\n=== Beta release artifacts ===');
-    console.log(`Notarized app bundle: ${notarizedArtifact}`);
+    console.log(`App bundle: ${notarizedArtifact}`);
     console.log(`DMG contains app from: ${notarizedArtifact}`);
     console.log(`DMG path: ${dmgPath || 'NOT FOUND'}`);
     console.log(`Notarization skipped: ${skipNotarize}`);

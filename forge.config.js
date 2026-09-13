@@ -26,6 +26,9 @@ function installMacAudioHelper(buildPath) {
 module.exports = {
     packagerConfig: {
         asar: true,
+        buildVersion: require('./package.json').version,
+        // Only ship application inputs, never .env, site/server config or local skills.
+        ignore: [/^\/(?!src(?:\/|$)|node_modules(?:\/|$)|package\.json$|entitlements\.plist$|LICENSE$).+/],
         extraResource: ['./src/assets/SystemAudioDump', './src/assets/CheatingDaddyAudio.app'],
         name: 'Menace Agent',
         executableName: 'Menace Agent',
@@ -64,13 +67,10 @@ module.exports = {
         afterCopy: [
             (buildPath, electronVersion, platform, arch, callback) => {
                 try {
-                    const resourcesPath =
-                        platform === 'darwin'
-                            ? path.join(buildPath, 'Contents', 'Resources')
-                            : path.join(buildPath, 'resources');
+                    const resourcesPath = path.dirname(buildPath);
                     writePublicRuntimeConfig(resourcesPath);
                     if (platform === 'darwin') {
-                        installMacAudioHelper(buildPath);
+                        installMacAudioHelper(path.resolve(buildPath, '..', '..', '..'));
                     }
                     callback();
                 } catch (error) {

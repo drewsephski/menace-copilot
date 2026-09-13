@@ -4,9 +4,10 @@ if (require('electron-squirrel-startup')) {
 
 require('./utils/loadEnv').loadEnv();
 
-const { app, BrowserWindow, shell, ipcMain } = require('electron');
+const { app, autoUpdater, BrowserWindow, dialog, shell, ipcMain } = require('electron');
 const { createWindow, updateGlobalShortcuts, applyWindowLayer } = require('./utils/window');
-const { checkForUpdates, getReleasePageUrl } = require('./utils/updateChecker');
+const { createUpdateController } = require('./utils/updateChecker');
+const { registerUpdateIpc } = require('./utils/updateIpc');
 const { setupGeminiIpcHandlers, stopMacOSAudioCapture, sendToRenderer } = require('./utils/gemini');
 const storage = require('./storage');
 const polar = require('./utils/polar');
@@ -15,6 +16,12 @@ const { getOpenRouterAccess, getUserOpenRouterApiKey, syncLicensedHostedAccess }
 
 const geminiSessionRef = { current: null };
 let mainWindow = null;
+const updater = createUpdateController({
+    app, autoUpdater,
+    onState: state => {
+        if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('app:update-status', state);
+    },
+});
 
 function openExternalWithoutBlocking(url) {
     void shell.openExternal(url).catch(error => {
@@ -61,6 +68,8 @@ app.whenReady().then(async () => {
     setupOpenRouterIpcHandlers();
     setupPolarIpcHandlers();
     setupGeneralIpcHandlers();
+    registerUpdateIpc({ ipcMain, controller: updater, getWindow: () => mainWindow, dialog });
+    updater.start();
 
     polar
         .getLicenseStatus()
@@ -75,7 +84,13 @@ app.on('window-all-closed', () => {
     }
 });
 
+autoUpdater.on('before-quit-for-update', () => {
+    stopMacOSAudioCapture();
+    require('./utils/localai').closeLocalSession();
+});
+
 app.on('before-quit', () => {
+    updater.dispose();
     stopMacOSAudioCapture();
     require('./utils/localai').closeLocalSession();
 });
@@ -502,31 +517,6 @@ function setupPolarIpcHandlers() {
 function setupGeneralIpcHandlers() {
     ipcMain.handle('get-app-version', async () => {
         return app.getVersion();
-    });
-
-    ipcMain.handle('app:check-updates', async () => {
-        try {
-            const result = await checkForUpdates();
-            return { success: true, data: result };
-        } catch (error) {
-            console.error('Error checking for updates:', error);
-            return { success: false, error: error.message };
-        }
-    });
-
-    ipcMain.handle('app:open-update', async () => {
-        try {
-            const releaseUrl = getReleasePageUrl();
-            if (!releaseUrl) {
-                return { success: false, error: 'No release page configured' };
-            }
-
-            openExternalWithoutBlocking(releaseUrl);
-            return { success: true };
-        } catch (error) {
-            console.error('Error opening update page:', error);
-            return { success: false, error: error.message };
-        }
     });
 
     ipcMain.handle('app:get-session-readiness', async () => {

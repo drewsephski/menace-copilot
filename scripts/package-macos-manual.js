@@ -156,6 +156,7 @@ function main() {
         CFBundleIdentifier: 'com.menaceagent.app',
         CFBundleExecutable: 'Menace Agent',
         CFBundleShortVersionString: require(path.join(projectRoot, 'package.json')).version,
+        CFBundleVersion: require(path.join(projectRoot, 'package.json')).version,
         NSAudioCaptureUsageDescription:
             'Menace Agent needs system audio access to hear other participants in the conversation from your computer speakers or headset.',
         NSScreenCaptureDescription: 'Menace Agent needs screen capture for contextual live conversation assistance.',

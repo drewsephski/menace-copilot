@@ -1,94 +1,98 @@
 'use strict';
 
-const { app } = require('electron');
 const { getUpdateSource } = require('../config/updateSource');
 
-function parseVersion(version) {
-    if (typeof version !== 'string' || !version.trim()) {
-        return null;
+// Electron owns download, signature verification, replacement and relaunch.
+// Inject its API so native failure paths can be exercised without installing.
+function createUpdateController({ app, autoUpdater, onState = () => {}, platform = process.platform, arch = process.arch }) {
+    let state = { status: 'idle', localVersion: app.getVersion(), remoteVersion: null, error: null };
+    let started = false;
+    let busy = false;
+    let interval;
+    let watchdog;
+    const listeners = [];
+    const snapshot = () => ({ ...state });
+    function publish(patch) {
+        state = { ...state, ...patch };
+        onState(snapshot());
     }
-    const parts = version.trim().split('.').map(part => {
-        const n = Number(part);
-        return Number.isFinite(n) ? n : 0;
-    });
-    return parts.length > 0 ? parts : null;
-}
-
-function isNewerVersion(remote, current) {
-    const remoteParts = parseVersion(remote);
-    const currentParts = parseVersion(current);
-    if (!remoteParts || !currentParts) {
-        return false;
+    function finish(patch) {
+        busy = false;
+        clearTimeout(watchdog);
+        publish(patch);
     }
-
-    const length = Math.max(remoteParts.length, currentParts.length);
-    for (let i = 0; i < length; i++) {
-        const r = remoteParts[i] || 0;
-        const c = currentParts[i] || 0;
-        if (r > c) {
-            return true;
+    function listen(name, listener) {
+        autoUpdater.on(name, listener);
+        listeners.push([name, listener]);
+    }
+    function start() {
+        if (started) return;
+        started = true;
+        if (!app.isPackaged || platform !== 'darwin' || arch !== 'arm64') {
+            publish({ status: 'unsupported', error: 'Automatic updates are available in the installed Apple Silicon Mac app.' });
+            return;
         }
-        if (r < c) {
-            return false;
+        listen('error', () => finish({ status: 'error', error: 'The update could not be checked, downloaded, or verified. Please try again.' }));
+        listen('update-available', () => {
+            publish({ status: 'downloading', error: null });
+            armWatchdog(30 * 60 * 1000);
+        });
+        listen('update-not-available', () => finish({ status: 'current', error: null }));
+        listen('update-downloaded', (_event, _notes, name) => {
+            finish({ status: 'ready', remoteVersion: typeof name === 'string' ? name.slice(0, 100) : null, error: null });
+        });
+        try {
+            autoUpdater.setFeedURL({ url: getUpdateSource(state.localVersion, platform, arch).feedUrl, serverType: 'default' });
+        } catch {
+            publish({ status: 'unsupported', error: 'The update service could not be initialized. Reinstall the latest Menace release.' });
+            return;
+        }
+        interval = setInterval(check, 60 * 60 * 1000);
+        interval.unref?.();
+        check();
+    }
+    function armWatchdog(milliseconds) {
+        clearTimeout(watchdog);
+        watchdog = setTimeout(() => {
+            // Native downloads cannot be canceled. Do not start a second one
+            // while the first may still be running, even after the UI timeout.
+            publish({ error: 'This update is taking longer than expected. Check your connection or quit and reopen Menace to retry.' });
+        }, milliseconds);
+        watchdog.unref?.();
+    }
+    function check() {
+        if (!started) {
+            start();
+            return snapshot();
+        }
+        if (busy || ['unsupported', 'ready', 'installing'].includes(state.status)) return snapshot();
+        busy = true;
+        publish({ status: 'checking', error: null });
+        armWatchdog(60 * 1000);
+        try {
+            autoUpdater.checkForUpdates();
+        } catch {
+            finish({ status: 'error', error: 'Could not start the update check. Please try again.' });
+        }
+        return snapshot();
+    }
+    function install() {
+        if (state.status !== 'ready') return { success: false, error: 'No verified update is ready to install.' };
+        publish({ status: 'installing', error: null });
+        try {
+            autoUpdater.quitAndInstall();
+            return { success: true };
+        } catch {
+            publish({ status: 'ready', error: 'Could not restart Menace. Please try again.' });
+            return { success: false, error: state.error };
         }
     }
-    return false;
+    function dispose() {
+        clearInterval(interval);
+        clearTimeout(watchdog);
+        for (const [name, listener] of listeners) autoUpdater.removeListener(name, listener);
+    }
+    return { start, check, install, snapshot, dispose };
 }
 
-async function fetchRemoteVersion(manifestUrl) {
-    const response = await fetch(manifestUrl, {
-        headers: { Accept: 'application/json' },
-    });
-    if (!response.ok) {
-        throw new Error(`Update manifest HTTP ${response.status}`);
-    }
-
-    const payload = await response.json();
-    if (!payload || typeof payload.version !== 'string') {
-        throw new Error('Update manifest missing version field');
-    }
-
-    return payload.version.trim();
-}
-
-async function checkForUpdates() {
-    const localVersion = app.getVersion();
-    const { versionManifestUrl, releasePageUrl } = getUpdateSource();
-
-    if (!versionManifestUrl) {
-        return {
-            updateAvailable: false,
-            localVersion,
-            remoteVersion: null,
-            releasePageUrl: releasePageUrl || null,
-        };
-    }
-
-    try {
-        const remoteVersion = await fetchRemoteVersion(versionManifestUrl);
-        return {
-            updateAvailable: isNewerVersion(remoteVersion, localVersion),
-            localVersion,
-            remoteVersion,
-            releasePageUrl: releasePageUrl || null,
-        };
-    } catch (error) {
-        console.warn('Update check failed:', error.message);
-        return {
-            updateAvailable: false,
-            localVersion,
-            remoteVersion: null,
-            releasePageUrl: releasePageUrl || null,
-        };
-    }
-}
-
-function getReleasePageUrl() {
-    return getUpdateSource().releasePageUrl;
-}
-
-module.exports = {
-    checkForUpdates,
-    getReleasePageUrl,
-    isNewerVersion,
-};
+module.exports = { createUpdateController };
