@@ -3,6 +3,7 @@ const { BrowserWindow, ipcMain } = require('electron');
 const { spawn } = require('child_process');
 const { saveDebugAudio } = require('../audioUtils');
 const { buildSessionSystemPrompt } = require('./prompts');
+const { DEFAULT_ANSWER_MODEL, getAnswerModelOptions } = require('../config/answerModel');
 const personalContextStorage = require('./personalContextStorage');
 const { renderPersonalContextForProfile } = require('./personalContext/render');
 const {
@@ -87,7 +88,7 @@ let openRouterRequestStartedForTurn = false;
 
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const OPENROUTER_MAX_TOKENS = 16384;
-const OPENROUTER_VISION_MODEL = 'google/gemini-2.5-flash';
+const OPENROUTER_VISION_MODEL = DEFAULT_ANSWER_MODEL;
 const OPENROUTER_EMPTY_RESPONSE_MESSAGE =
     'OpenRouter reached the maximum token limit before returning a final answer. Try a shorter prompt or a different model.';
 
@@ -393,6 +394,7 @@ async function sendToOpenRouter(transcription) {
                     model: modelToUse,
                     messages,
                     stream: true,
+                    ...getAnswerModelOptions(modelToUse),
                     temperature: 0.7,
                     max_tokens: OPENROUTER_MAX_TOKENS,
                 }),
@@ -1009,6 +1011,7 @@ async function sendImageToOpenRouter(base64Data, prompt) {
                 messages,
                 stream: true,
                 max_tokens: OPENROUTER_MAX_TOKENS,
+                ...getAnswerModelOptions(model),
             }),
         });
 

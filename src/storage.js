@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { encryptCredentialFields, decryptCredentialFields, migrateCredentialsFile } = require('./utils/secureCredentials');
+const { DEFAULT_ANSWER_MODEL } = require('./config/answerModel');
 
 const CONFIG_VERSION = 1;
 
@@ -11,7 +12,7 @@ const DEFAULT_CONFIG = {
     onboarded: false,
     layout: 'normal',
     geminiLiveModel: 'gemini-3.1-flash-live-preview',
-    openrouterModel: 'google/gemini-3.5-flash-lite',
+    openrouterModel: DEFAULT_ANSWER_MODEL,
 };
 
 const DEFAULT_CREDENTIALS = {
@@ -220,6 +221,19 @@ function migrateOpenRouterFlashDefaults() {
     writeJsonFile(getConfigPath(), next);
 }
 
+function migrateOpenRouterGlmDefaults() {
+    const saved = readJsonFile(getConfigPath(), {});
+    if (saved.openrouterDefaultsV4) {
+        return;
+    }
+
+    const next = { ...saved, openrouterDefaultsV4: true };
+    if (!next.openrouterModel || next.openrouterModel === 'google/gemini-3.5-flash-lite' || LEGACY_OPENROUTER_MODELS.has(next.openrouterModel)) {
+        next.openrouterModel = DEFAULT_CONFIG.openrouterModel;
+    }
+    writeJsonFile(getConfigPath(), next);
+}
+
 // Initialize storage - call this on app startup
 function initializeStorage() {
     if (needsReset()) {
@@ -232,6 +246,7 @@ function initializeStorage() {
         }
         migrateOpenRouterDefaults();
         migrateOpenRouterFlashDefaults();
+        migrateOpenRouterGlmDefaults();
         migrateProfileContexts();
         migrateFontSizePreference();
         migrateCredentialsFile(getCredentialsPath());

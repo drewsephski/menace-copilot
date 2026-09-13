@@ -6,6 +6,7 @@ const {
     MAX_TOTAL_CHARS,
     MAX_IMAGE_CHARS,
     getProductionModel,
+    getAnswerModelOptions,
     clampTemperature,
     clampMaxTokens,
 } = require('./gatewayConfig');
@@ -99,10 +100,12 @@ function validateChatRequest(body) {
         }
     }
 
+    const model = getProductionModel();
     return {
         ok: true,
         payload: {
-            model: getProductionModel(),
+            model,
+            ...getAnswerModelOptions(model),
             messages: body.messages,
             stream: body.stream !== false,
             temperature: clampTemperature(body.temperature),

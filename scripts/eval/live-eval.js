@@ -12,6 +12,7 @@ const path = require('path');
 
 require(path.join(__dirname, '..', '..', 'src', 'utils', 'loadEnv')).loadEnv();
 const { getSystemPrompt } = require(path.join(__dirname, '..', '..', 'src', 'utils', 'prompts'));
+const { getProductionModel, getAnswerModelOptions } = require('../../site/lib/gatewayConfig');
 
 const HIGH_RISK_SAMPLES = 5;
 
@@ -256,6 +257,7 @@ async function callOpenRouter(model, systemPrompt, userPrompt) {
             model,
             stream: true,
             temperature: 0.4,
+            ...getAnswerModelOptions(model),
             messages: [
                 { role: 'system', content: systemPrompt },
                 { role: 'user', content: userPrompt },
@@ -305,7 +307,7 @@ async function callOpenRouter(model, systemPrompt, userPrompt) {
 }
 
 async function main() {
-    const model = process.env.MENACE_EVAL_MODEL || 'google/gemini-3.5-flash-lite';
+    const model = process.env.MENACE_EVAL_MODEL || getProductionModel();
     const menaceStarted = Date.now();
     const results = [];
 

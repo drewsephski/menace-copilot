@@ -1,4 +1,4 @@
-const { describe, test } = require('node:test');
+const { describe, test, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('path');
 
@@ -14,6 +14,16 @@ const validateChatRequest = require(path.join(
 const { MAX_IMAGE_CHARS } = require(path.join(__dirname, '..', '..', '..', 'site', 'lib', 'gatewayConfig'));
 
 describe('hosted gateway request validation', () => {
+    let originalModel;
+    beforeEach(() => {
+        originalModel = process.env.MENACE_GATEWAY_MODEL;
+        delete process.env.MENACE_GATEWAY_MODEL;
+    });
+    afterEach(() => {
+        if (originalModel === undefined) delete process.env.MENACE_GATEWAY_MODEL;
+        else process.env.MENACE_GATEWAY_MODEL = originalModel;
+    });
+
     test('selects production model server-side and clamps unsafe parameters', () => {
         const result = validateChatRequest({
             messages: [{ role: 'user', content: 'Hello' }],
@@ -22,7 +32,8 @@ describe('hosted gateway request validation', () => {
         });
 
         assert.equal(result.ok, true);
-        assert.equal(result.payload.model, 'google/gemini-3.5-flash-lite');
+        assert.equal(result.payload.model, 'z-ai/glm-5.3-flash');
+        assert.deepEqual(result.payload.reasoning, { effort: 'low', exclude: true });
         assert.equal(result.payload.temperature, 1);
         assert.equal(result.payload.max_tokens, 4096);
     });
@@ -34,7 +45,34 @@ describe('hosted gateway request validation', () => {
         });
 
         assert.equal(result.ok, true);
-        assert.equal(result.payload.model, 'google/gemini-3.5-flash-lite');
+        assert.equal(result.payload.model, 'z-ai/glm-5.3-flash');
+    });
+
+    test('does not allow clients to increase reasoning effort or expose reasoning', () => {
+        const result = validateChatRequest({
+            messages: [{ role: 'user', content: 'Hello' }],
+            reasoning: { effort: 'max', exclude: false },
+            reasoning_effort: 'max',
+            include_reasoning: true,
+        });
+        assert.equal(result.ok, true);
+        assert.deepEqual(result.payload.reasoning, { effort: 'low', exclude: true });
+        assert.equal('reasoning_effort' in result.payload, false);
+        assert.equal('include_reasoning' in result.payload, false);
+    });
+
+    test('preserves an allowed server model override without applying GLM options', () => {
+        process.env.MENACE_GATEWAY_MODEL = 'google/gemini-2.5-flash';
+        const result = validateChatRequest({ messages: [{ role: 'user', content: 'Hello' }] });
+        assert.equal(result.payload.model, 'google/gemini-2.5-flash');
+        assert.equal('reasoning' in result.payload, false);
+    });
+
+    test('falls back to GLM for an unsupported server override', () => {
+        process.env.MENACE_GATEWAY_MODEL = 'unknown/model';
+        const result = validateChatRequest({ messages: [{ role: 'user', content: 'Hello' }] });
+        assert.equal(result.payload.model, 'z-ai/glm-5.3-flash');
+        assert.deepEqual(result.payload.reasoning, { effort: 'low', exclude: true });
     });
 
     test('rejects arbitrary provider parameters', () => {
@@ -73,6 +111,8 @@ describe('hosted gateway request validation', () => {
         });
 
         assert.equal(result.ok, true);
+        assert.equal(result.payload.model, 'z-ai/glm-5.3-flash');
+        assert.deepEqual(result.payload.reasoning, { effort: 'low', exclude: true });
     });
 
     test('rejects vision messages when image payload exceeds image limit', () => {

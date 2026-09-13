@@ -11,7 +11,7 @@ require(path.join(__dirname, '..', '..', 'src', 'utils', 'loadEnv')).loadEnv();
 
 const { validateAndNormalizePersonalContext } = require('../../src/utils/personalContext/schema');
 const { buildSystemPrompt } = require('../../src/utils/prompts');
-const { getProductionModel } = require('../../site/lib/gatewayConfig');
+const { getProductionModel, getAnswerModelOptions } = require('../../site/lib/gatewayConfig');
 
 const SAMPLES_PER_CASE = Number(process.env.MENACE_ADVERSARIAL_SAMPLES || 5);
 const MODEL = process.env.MENACE_ADVERSARIAL_MODEL || getProductionModel();
@@ -211,6 +211,7 @@ async function callModel(systemPrompt, userPrompt) {
         body: JSON.stringify({
             model: MODEL,
             temperature: 0.2,
+            ...getAnswerModelOptions(MODEL),
             messages: [
                 { role: 'system', content: systemPrompt },
                 { role: 'user', content: userPrompt },

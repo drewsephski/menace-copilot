@@ -5,13 +5,14 @@ const path = require('path');
 const { normalizeBenefitCatalog } = require('./hostedAiEntitlement');
 
 const ALLOWED_MODELS = new Set([
+    'z-ai/glm-5.3-flash',
     'google/gemini-2.5-flash',
     'google/gemini-2.5-flash-lite',
     'google/gemini-3.5-flash-lite',
     'google/gemini-3-flash-preview',
 ]);
 
-const DEFAULT_MODEL = 'google/gemini-3.5-flash-lite';
+const DEFAULT_MODEL = 'z-ai/glm-5.3-flash';
 const MAX_MESSAGES = 24;
 const MAX_MESSAGE_CHARS = 12000;
 const MAX_TOTAL_CHARS = 48000;
@@ -97,6 +98,11 @@ function resolveModel(_requested) {
     return getProductionModel();
 }
 
+function getAnswerModelOptions(model) {
+    // Keep this policy server-side; clients must not increase reasoning cost.
+    return model === DEFAULT_MODEL ? { reasoning: { effort: 'low', exclude: true } } : {};
+}
+
 module.exports = {
     ALLOWED_MODELS,
     DEFAULT_MODEL,
@@ -116,5 +122,6 @@ module.exports = {
     clampTemperature,
     clampMaxTokens,
     getProductionModel,
+    getAnswerModelOptions,
     resolveModel,
 };

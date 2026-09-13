@@ -17,7 +17,9 @@ If quota storage is unavailable, the gateway returns **503** and does not proxy 
 
 ## Model policy
 
-The production model is selected server-side (`MENACE_GATEWAY_MODEL` or default `google/gemini-3.5-flash-lite`). Client `model` fields are ignored.
+The production model is selected server-side (`MENACE_GATEWAY_MODEL` or default `z-ai/glm-5.3-flash`). Client `model` fields are ignored. GLM uses low reasoning effort for responsive spoken answers; reasoning content is excluded from the response. Client reasoning overrides are ignored. The same model supports screenshot input.
+
+To activate this change for hosted users, deploy `site/` and remove an existing `MENACE_GATEWAY_MODEL` override or set it to `z-ai/glm-5.3-flash`. Desktop prompt, BYOK, and screenshot changes require restarting the updated development app or distributing a rebuilt app. Existing default desktop models migrate once; custom model choices are preserved.
 
 ## Residual abuse surface
 
