@@ -27,6 +27,7 @@ function fixture(t, overrides = {}) {
         autoUpdater: native,
         platform: 'darwin',
         arch: 'arm64',
+        fetchImpl: async () => ({ ok: true, json: async () => [{ draft: false, prerelease: false }] }),
         onState: state => states.push(state),
         ...overrides,
     });
@@ -74,11 +75,12 @@ test('only native signature-verified update-downloaded enables install, never au
 });
 
 for (const reason of ['malformed feed', 'offline', 'interrupted download', 'invalid ZIP', 'signature mismatch']) {
-    test(`native ${reason} error blocks installation and permits retry`, t => {
+    test(`native ${reason} error blocks installation and permits retry`, async t => {
         const f = fixture(t);
         f.controller.start();
         f.native.emit('update-available');
         f.native.emit('error', new Error(reason));
+        await new Promise(resolve => setImmediate(resolve));
         assert.equal(f.controller.snapshot().status, 'error');
         assert.ok(f.controller.snapshot().error);
         assert.equal(f.controller.install().success, false);
@@ -86,6 +88,18 @@ for (const reason of ['malformed feed', 'offline', 'interrupted download', 'inva
         assert.equal(f.checks(), 2);
     });
 }
+
+test('missing public stable releases are explained and can be opened from trusted IPC', async t => {
+    const f = ipcFixture(t, { fetchImpl: async () => ({ ok: true, json: async () => [] }) });
+    f.controller.start();
+    f.native.emit('error', new Error('HTTP 404'));
+    await new Promise(resolve => setImmediate(resolve));
+    assert.match(f.controller.snapshot().error, /No stable update has been published/);
+
+    const openLatest = f.handlers.get('app:open-latest-release');
+    assert.deepEqual(await openLatest(f.event), { success: true });
+    assert.equal(f.openedUrl(), 'https://github.com/drewsephski/menace-copilot/releases/latest');
+});
 
 test('synchronous failures are surfaced and a failed restart retains the verified download', t => {
     const f = fixture(t);
@@ -144,15 +158,25 @@ test('untrusted URL/version/platform values cannot redirect the native feed', ()
     assert.throws(() => getUpdateSource('1.0.1', 'darwin/evil', 'arm64'));
 });
 
-function ipcFixture(t) {
-    const f = fixture(t);
+function ipcFixture(t, overrides = {}) {
+    const f = fixture(t, overrides);
     const handlers = new Map();
+    let openedUrl = null;
     const frame = { url: require('node:url').pathToFileURL(require('node:path').resolve(__dirname, '../../index.html')).href };
     const window = { isDestroyed: () => false, webContents: { mainFrame: frame } };
     const event = { sender: window.webContents, senderFrame: frame };
     const dialog = { showMessageBox: async () => ({ response: 1 }) };
-    registerUpdateIpc({ ipcMain: { handle: (name, fn) => handlers.set(name, fn) }, controller: f.controller, getWindow: () => window, dialog });
-    return { ...f, handlers, event, dialog };
+    registerUpdateIpc({
+        ipcMain: { handle: (name, fn) => handlers.set(name, fn) },
+        controller: f.controller,
+        getWindow: () => window,
+        dialog,
+        openExternal: async url => {
+            openedUrl = url;
+        },
+        releasePageUrl: 'https://github.com/drewsephski/menace-copilot/releases/latest',
+    });
+    return { ...f, handlers, event, dialog, openedUrl: () => openedUrl };
 }
 
 test('IPC rejects foreign windows, subframes and renderer-supplied arguments', async t => {

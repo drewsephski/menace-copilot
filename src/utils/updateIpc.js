@@ -4,7 +4,7 @@ const { pathToFileURL } = require('node:url');
 const path = require('node:path');
 const APP_URL = pathToFileURL(path.resolve(__dirname, '../index.html')).href;
 
-function registerUpdateIpc({ ipcMain, controller, getWindow, dialog }) {
+function registerUpdateIpc({ ipcMain, controller, getWindow, dialog, openExternal, releasePageUrl }) {
     let confirming = false;
     function trusted(event, args) {
         const window = getWindow();
@@ -26,6 +26,15 @@ function registerUpdateIpc({ ipcMain, controller, getWindow, dialog }) {
             return { success: true, data: action() };
         });
     }
+    ipcMain.handle('app:open-latest-release', async (event, ...args) => {
+        if (!trusted(event, args)) return { success: false, error: 'Invalid update request.' };
+        try {
+            await openExternal(releasePageUrl);
+            return { success: true };
+        } catch {
+            return { success: false, error: 'Could not open the release page.' };
+        }
+    });
     ipcMain.handle('app:install-update', async (event, ...args) => {
         if (!trusted(event, args)) return { success: false, error: 'Invalid update request.' };
         if (confirming) return { success: false, error: 'A restart choice is already open.' };

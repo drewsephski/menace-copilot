@@ -38,7 +38,7 @@ const VAD_MODES = {
     LOW_BITRATE: { energyThreshold: 0.008, speechFramesRequired: 4, silenceFramesRequired: 35 },
     AGGRESSIVE: { energyThreshold: 0.015, speechFramesRequired: 2, silenceFramesRequired: 20 },
     // Slightly stricter than before: tiny Whisper models invent phrases on low-energy noise.
-    VERY_AGGRESSIVE: { energyThreshold: 0.028, speechFramesRequired: 4, silenceFramesRequired: 18 },
+    VERY_AGGRESSIVE: { energyThreshold: 0.028, speechFramesRequired: 4, silenceFramesRequired: 8 },
 };
 
 // Common Whisper hallucinations (especially tiny.en) on silence / UI noise / music.
@@ -211,6 +211,7 @@ async function transcribeAudio(pcm16kBuffer) {
 
 async function handleSpeechEnd(audioData) {
     if (!isLocalActive) return;
+    const speechEndAt = Date.now();
 
     // Require ~0.75s of 16 kHz mono PCM before asking Whisper (cuts silence hallucinations).
     if (audioData.length < 24000) {
@@ -228,6 +229,7 @@ async function handleSpeechEnd(audioData) {
 
     try {
         const transcription = await transcribeAudio(audioData);
+        console.log('[LocalAI] Speech-to-text latency:', `${Date.now() - speechEndAt}ms`);
 
         if (!transcription || transcription.length < 2) {
             console.log('[LocalAI] Empty transcription, skipping');
@@ -252,6 +254,7 @@ async function handleSpeechEnd(audioData) {
 
         isGeneratingAnswer = true;
         sendToRenderer('update-status', 'Generating response...');
+        const answerStartedAt = Date.now();
         try {
             if (answerBackend === 'openrouter') {
                 console.log('[LocalAI] Routing transcription to OpenRouter:', transcription);
@@ -259,6 +262,7 @@ async function handleSpeechEnd(audioData) {
             } else {
                 await sendToLlama(transcription);
             }
+            console.log('[LocalAI] Answer generation latency:', `${Date.now() - answerStartedAt}ms`);
         } finally {
             isGeneratingAnswer = false;
         }

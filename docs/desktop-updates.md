@@ -1,6 +1,6 @@
 # Desktop updates
 
-Menace Agent 1.0.1 adds the first in-app installer. Install this bootstrap build once; an older app with the release-page-only checker cannot upgrade itself into the new installer.
+Menace Agent 1.0.1 introduced the in-app installer. Version 1.0.2 improves update error guidance and voice response latency. Apps older than 1.0.1 still need a one-time manual installation because they do not include the installer.
 
 ## Release contract
 
@@ -15,37 +15,24 @@ Menace Agent 1.0.1 adds the first in-app installer. Install this bootstrap build
 - Restart requires an explicit choice; Later retains the downloaded update. Squirrel may apply a downloaded update on the next normal app launch as well.
 - Data remains outside the app bundle in the existing config directory. The release version does not change `CONFIG_VERSION`, encrypted credential format or history paths.
 
-## One-time GitHub setup
+## Local release workflow
 
-Set these in Settings → Secrets and variables → Actions for `drewsephski/menace-copilot`:
+Build and sign releases on the Mac that holds the existing Developer ID Application identity. GitHub Releases hosts the finished files; GitHub Actions and GitHub-stored Apple credentials are not required for in-app updating.
 
-| Secret | Value |
-| --- | --- |
-| `MACOS_CERTIFICATE_P12_BASE64` | Base64 of the exported Developer ID Application identity, including its private key |
-| `MACOS_CERTIFICATE_PASSWORD` | Password used to protect that P12 export |
-| `APPLE_ID` | Apple ID authorized to notarize for this team |
-| `APPLE_APP_SPECIFIC_PASSWORD` | Apple app-specific password for notarization |
-| `APPLE_TEAM_ID` | `2NHJGX6A7S` |
+1. Bump the app version in `package.json` and root package-lock metadata, then update `docs/desktop-release-notes.md`.
+2. Run `pnpm run check`.
+3. Build with `pnpm run beta:macos`. Set `APPLE_NOTARY_PROFILE` to an Apple `notarytool` keychain profile, or provide `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, and `APPLE_TEAM_ID` in the ignored local `.env`. Do not export signing credentials to GitHub.
+4. The build stages the versioned ZIP, DMG and SHA256SUMS under `out/release/`. Verify signatures, the notarization ticket and checksums before publishing.
+5. When a release is requested, upload those exact artifacts to a stable GitHub release in `drewsephski/menace-copilot`, with a matching `vX.Y.Z` tag. Stage a draft first, re-download and verify checksums, then publish it.
+6. The app discovers published stable releases through the official Electron update service. Verify a higher version from an older installed app, including download, restart and retained data.
 
-Export the existing Developer ID Application identity from Keychain Access as a password-protected `.p12`. To copy its encoded value without printing it: `base64 -i /path/to/identity.p12 | pbcopy`. Paste into GitHub Secrets. Do not put credentials in repository files, chat, or public runtime configuration.
-
-GitHub's built-in `GITHUB_TOKEN` handles release upload; no separate GitHub token is needed. The workflow imports the certificate into an ephemeral keychain and deletes it afterward. Public release builds cannot skip notarization.
-
-## Publish a release
-
-1. Update `package.json` version, the root metadata in `package-lock.json`, and `docs/desktop-release-notes.md`. The pnpm lockfile remains authoritative.
-2. Run `pnpm run check` and review the release diff. Commit the intended source and push a matching numeric tag, e.g. `v1.0.2`.
-3. The Desktop Release workflow on that tag checks, signs, notarizes, verifies, makes ZIP/DMG, and stages a draft GitHub release. It re-downloads the assets and verifies SHA-256 before publishing the release as latest.
-4. `out/release/` contains the exact versioned assets and `SHA256SUMS`. A failed upload leaves a draft; inspect and remove the incomplete draft before retrying. Do not silently replace existing public assets.
-5. Verify the public feed from an older installed app. Allow for update-service caching after publishing. Confirm checking → downloading → restart → new running version and retained settings/license/history.
-
-Manual workflow runs must also target the matching version tag. CI artifacts by themselves are not a published update. Tag publication advertises the new version to all installed stable-channel clients.
+No Apple credentials are needed by the installed app. Locally installing the bootstrap does not publish a release. Until a higher version is uploaded, there is no remote update to install; an empty release repository may return a check error.
 
 ## Local checks
 
 `pnpm run check` runs syntax, architecture checks and tests (including updater state, errors, retry, IPC trust and restart confirmation). This JavaScript repository has no `typecheck` script.
 
-`pnpm run beta:macos` is the notarized release path. `SKIP_NOTARIZE=1 pnpm run beta:macos` is only for a signed local test build, never a public release. CI fails rather than silently using the manual packaging fallback.
+`pnpm run beta:macos` is the notarized release path. `SKIP_NOTARIZE=1 pnpm run beta:macos` is only for a signed local test build, never a public release.
 
 `node scripts/checks/test-native-updater-macos.js` runs the native Squirrel engine against isolated signed fixtures. It verifies no update, rejects a broken ZIP and an ad-hoc signed replacement, then installs a matching Developer ID build, relaunches at the higher version, and checks fixture data. It requires the local Developer ID signing identity and keeps fixtures in a temporary directory. Loopback HTTP and timestamp-free signing are confined to this test; public releases still require HTTPS and notarization.
 

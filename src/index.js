@@ -8,6 +8,7 @@ const { app, autoUpdater, BrowserWindow, dialog, shell, ipcMain } = require('ele
 const { createWindow, updateGlobalShortcuts, applyWindowLayer } = require('./utils/window');
 const { createUpdateController } = require('./utils/updateChecker');
 const { registerUpdateIpc } = require('./utils/updateIpc');
+const { UPDATE_REPOSITORY } = require('./config/updateSource');
 const { setupGeminiIpcHandlers, stopMacOSAudioCapture, sendToRenderer } = require('./utils/gemini');
 const storage = require('./storage');
 const polar = require('./utils/polar');
@@ -68,7 +69,14 @@ app.whenReady().then(async () => {
     setupOpenRouterIpcHandlers();
     setupPolarIpcHandlers();
     setupGeneralIpcHandlers();
-    registerUpdateIpc({ ipcMain, controller: updater, getWindow: () => mainWindow, dialog });
+    registerUpdateIpc({
+        ipcMain,
+        controller: updater,
+        getWindow: () => mainWindow,
+        dialog,
+        openExternal: url => shell.openExternal(url),
+        releasePageUrl: `https://github.com/${UPDATE_REPOSITORY}/releases/latest`,
+    });
     updater.start();
 
     polar

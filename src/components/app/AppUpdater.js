@@ -22,6 +22,17 @@ export class AppUpdater extends LitElement {
         button:hover:not(:disabled) {
             background: #ffffff14;
         }
+        .release-link {
+            margin-top: 6px;
+            border-color: transparent;
+            background: transparent;
+            opacity: 0.78;
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
+        .release-link:hover {
+            opacity: 1;
+        }
         button:focus-visible {
             outline: 2px solid #a7d7c5;
             outline-offset: 3px;
@@ -79,6 +90,15 @@ export class AppUpdater extends LitElement {
             this.actionError = 'Update request failed. Please try again.';
         }
     }
+    async openLatestRelease() {
+        this.actionError = '';
+        try {
+            const result = await window.menace.app.openLatestRelease();
+            if (!result?.success) this.actionError = result?.error || 'Could not open the release page.';
+        } catch {
+            this.actionError = 'Could not open the release page.';
+        }
+    }
     render() {
         const { status, localVersion, error } = this.state;
         const labels = {
@@ -97,6 +117,7 @@ export class AppUpdater extends LitElement {
             </button>
             <div class="version" role="status">${localVersion ? `v${localVersion}` : ''}${status === 'current' ? ' · Up to date' : ''}</div>
             ${status === 'ready' ? html`<div class="detail">Update downloaded. Restart when you’re ready.</div>` : ''}
+            ${status === 'error' ? html`<button class="release-link" @click=${this.openLatestRelease}>Open latest release</button>` : ''}
             ${this.actionError || error ? html`<div class="detail error" role="alert">${this.actionError || error}</div>` : ''}
         `;
     }

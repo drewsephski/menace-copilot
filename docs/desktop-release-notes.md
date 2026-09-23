@@ -1,8 +1,7 @@
-Menace Agent now supports updates inside the app.
+Menace Agent 1.0.2 makes the in-app updater clearer when no compatible release is available, and adds a shortcut to the latest release page.
 
-- Check for updates from the sidebar.
-- Updates download in the background; choose **Restart to update** when you are ready.
-- Saved settings, license access, and conversation history stay in place.
-- Uses GLM Flash for concise, personable responses.
+- Speech capture now waits about 0.8 seconds of silence before transcribing, down from about 1.8 seconds.
+- Local logs report transcription and answer-generation latency separately to help diagnose slow spoken responses.
+- Existing settings, license access, and conversation history remain outside the app bundle and are retained during updates.
 
-Apple Silicon Mac release. Install this updater-enabled version once using the DMG; subsequent stable releases can install from inside Menace.
+Apple Silicon macOS release. Existing updater-enabled installations can download this stable release from inside Menace.

@@ -6,7 +6,7 @@ The current release contract and credential setup are documented in [desktop-upd
 - `src/utils/updateChecker.js`: single main-process native updater controller with retry and download/ready/error states.
 - `src/utils/updateIpc.js`, `src/preload.js`: trusted main-frame IPC, no renderer-supplied URLs, explicit Restart/Later choice.
 - `src/components/app/AppUpdater.js`: reusable visible manual check and status control in both app shells.
-- `.github/workflows/beta-release.yml`: pnpm/Node 24 tag-triggered signing, notarization, fresh assets, draft download/checksum verification then publication.
+- Release locally from this Mac; GitHub Releases hosts the finished files. The existing beta Actions workflow is not the publication path and does not require new secrets for this workflow.
 - `scripts/beta-release-macos.js`, `scripts/stage-macos-release.js`: ZIP and DMG from the same signed/stapled bundle, stable versioned names, SHA256SUMS. CI does not fall back to manual packaging.
 - `forge.config.js`: app version/build version, signed bundle ID `com.menaceagent.app`, Developer ID team `2NHJGX6A7S`, allowlisted packaged inputs, correct pre-sign runtime config/audio helper placement.
 - `scripts/package-macos-manual.js`: local fallback; both bundle versions match the package version. Do not claim CI-equivalent fuse proof for this fallback.

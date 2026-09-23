@@ -1,7 +1,7 @@
 {
     "name": "menace-agent",
     "productName": "Menace Agent",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "description": "Menace Agent \u2014 real-time conversation copilot with OpenRouter and local Whisper",
     "main": "src/index.js",
     "scripts": {

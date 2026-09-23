@@ -23,6 +23,9 @@ const arch = 'arm64';
 const outDir = path.join(projectRoot, 'out', `Menace Agent-darwin-${arch}`);
 const appPath = path.join(outDir, 'Menace Agent.app');
 
+// Keep release credentials in the ignored local .env or the caller's environment.
+require('../src/utils/loadEnv').loadEnv();
+
 const skipNotarize = process.env.SKIP_NOTARIZE === '1' || process.env.SKIP_NOTARIZE === 'true';
 
 function run(cmd, args, opts = {}) {
@@ -41,15 +44,19 @@ function runCapture(cmd, args) {
 }
 
 function requireNotarizeCredentials() {
+    const keychainProfile = process.env.APPLE_NOTARY_PROFILE || '';
     const appleId = process.env.APPLE_ID || '';
     const password = process.env.APPLE_APP_SPECIFIC_PASSWORD || '';
     const teamId = process.env.APPLE_TEAM_ID || '';
+    if (keychainProfile) {
+        return { keychainProfile };
+    }
     if (!appleId || !password || !teamId) {
         throw new Error(
-            'Notarized beta releases require APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, and APPLE_TEAM_ID'
+            'Notarized beta releases require APPLE_NOTARY_PROFILE or APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, and APPLE_TEAM_ID'
         );
     }
-    return { appleId, password, teamId };
+    return { appleId, password, teamId, keychainProfile: '' };
 }
 
 function packageWithForge() {
@@ -63,24 +70,19 @@ function packageManual() {
 }
 
 function notarizeAndStaple(appBundle) {
-    const { appleId, password, teamId } = requireNotarizeCredentials();
+    const { appleId, password, teamId, keychainProfile } = requireNotarizeCredentials();
     const zipPath = path.join(os.tmpdir(), `menace-agent-notarize-${Date.now()}.zip`);
 
     console.log('\n==> Submitting app for notarization:', appBundle);
     run('ditto', ['-c', '-k', '--keepParent', appBundle, zipPath]);
 
-    run('xcrun', [
-        'notarytool',
-        'submit',
-        zipPath,
-        '--apple-id',
-        appleId,
-        '--password',
-        password,
-        '--team-id',
-        teamId,
-        '--wait',
-    ]);
+    const submitArgs = ['notarytool', 'submit', zipPath, '--wait'];
+    if (keychainProfile) {
+        submitArgs.push('--keychain-profile', keychainProfile);
+    } else {
+        submitArgs.push('--apple-id', appleId, '--password', password, '--team-id', teamId);
+    }
+    run('xcrun', submitArgs);
 
     fs.rmSync(zipPath, { force: true });
 
