@@ -213,14 +213,13 @@ function initBlockReveal() {
             gsap.set(text, { opacity: 0, yPercent: 100 });
             gsap.set(wipe, { scaleX: 0, transformOrigin: 'left center' });
 
-            gsap
-                .timeline({
-                    scrollTrigger: {
-                        trigger: block,
-                        start: 'top 85%',
-                        once: true,
-                    },
-                })
+            gsap.timeline({
+                scrollTrigger: {
+                    trigger: block,
+                    start: 'top 85%',
+                    once: true,
+                },
+            })
                 .to(wipe, { scaleX: 1, duration: 0.55, ease: 'expo.inOut' })
                 .to(text, { opacity: 1, yPercent: 0, duration: 0.5, ease: 'expo.out' }, '-=0.28')
                 .to(wipe, { scaleX: 0, transformOrigin: 'right center', duration: 0.5, ease: 'expo.inOut' }, '+=0.12');
@@ -383,75 +382,6 @@ function initSterlingNav() {
     });
 }
 
-function initDemoVideo() {
-    const frame = document.querySelector('[data-demo-frame]');
-    const video = frame?.querySelector('[data-demo-video]');
-    const placeholder = frame?.querySelector('[data-demo-placeholder]');
-    const playBtn = frame?.querySelector('[data-demo-play]');
-    const note = frame?.querySelector('[data-demo-note]');
-
-    if (!frame || !video || !placeholder) return;
-
-    let videoReady = false;
-
-    function showVideo() {
-        frame.classList.add('has-video');
-        frame.classList.remove('is-loading');
-        placeholder.hidden = true;
-        video.hidden = false;
-        video.controls = true;
-        video.play().catch(() => {});
-    }
-
-    function markReady() {
-        videoReady = true;
-        frame.classList.add('has-video-ready');
-        if (note) {
-            note.textContent = 'Press play to watch Menace on a live call.';
-        }
-    }
-
-    function markUnavailable() {
-        videoReady = false;
-        frame.classList.remove('has-video-ready', 'is-loading');
-        if (note) {
-            note.innerHTML = 'Add <code>site/demo.mp4</code> to enable playback.';
-        }
-    }
-
-    video.addEventListener('loadedmetadata', markReady);
-    video.addEventListener('canplay', markReady);
-    video.addEventListener('error', markUnavailable);
-
-    playBtn?.addEventListener('click', () => {
-        if (videoReady || video.readyState >= 1) {
-            showVideo();
-            return;
-        }
-
-        frame.classList.add('is-loading');
-        video.load();
-
-        const onReady = () => {
-            video.removeEventListener('canplay', onReady);
-            video.removeEventListener('error', onFail);
-            markReady();
-            showVideo();
-        };
-
-        const onFail = () => {
-            video.removeEventListener('canplay', onReady);
-            video.removeEventListener('error', onFail);
-            markUnavailable();
-        };
-
-        video.addEventListener('canplay', onReady, { once: true });
-        video.addEventListener('error', onFail, { once: true });
-    });
-
-    video.load();
-}
-
 function buildTagRow(tags, className = '') {
     const tripled = [...tags, ...tags, ...tags];
     const items = tripled
@@ -565,5 +495,4 @@ document.addEventListener('DOMContentLoaded', () => {
     initParallax();
     initSterlingNav();
     initMagnifiedBento();
-    initDemoVideo();
 });
