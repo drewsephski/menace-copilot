@@ -6,7 +6,7 @@
     inset: 0;
     pointer-events: none;
     z-index: 0;
-    opacity: 0.14;
+    opacity: 0.09;
     filter: url(#menace-grain);
 }
 
@@ -15,22 +15,24 @@
     inset: -5%;
     pointer-events: none;
     z-index: 0;
-    background:
-        radial-gradient(ellipse 55% 40% at 70% 18%, rgba(196, 30, 58, 0.1) 0%, transparent 55%),
-        radial-gradient(ellipse 40% 35% at 20% 80%, rgba(196, 30, 58, 0.04) 0%, transparent 50%);
+    /* Parallax layer stays empty — single tally wash lives on .hood-bg (DESIGN.md booth leak). */
     transition: transform 0.4s ease-out;
     will-change: transform;
 }
 
-/* ── Text reveal (Text Reveal) ── */
+/* ── Text reveal (per-char, word-safe wrapping) ── */
 .text-reveal {
-    display: flex;
-    flex-wrap: wrap;
-    max-width: 14ch;
+    display: block;
+    max-width: min(18em, 100%);
+    text-wrap: balance;
+}
+
+.text-reveal-line {
+    display: block;
 }
 
 .text-reveal .char {
-    display: inline-block;
+    display: inline;
     opacity: 0;
     filter: blur(10px);
     transform: translateY(35%) scale(1.05);
@@ -101,56 +103,6 @@
     transition-delay: 0.45s;
 }
 
-/* ── Demo video ── */
-.demo-play-btn {
-    width: 48px;
-    height: 48px;
-    border-radius: 50%;
-    border: 1px solid var(--border);
-    background: var(--elevated);
-    display: grid;
-    place-items: center;
-    color: var(--secondary);
-    cursor: pointer;
-    transition: background var(--transition), border-color var(--transition), color var(--transition), transform var(--transition);
-}
-
-.demo-play-btn:hover {
-    background: var(--hover);
-    border-color: var(--chrome);
-    color: var(--cream);
-    transform: scale(1.05);
-}
-
-.demo-play-btn:focus-visible {
-    outline: 2px solid var(--tally);
-    outline-offset: 2px;
-}
-
-.demo-frame video {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    background: var(--hood);
-}
-
-.demo-frame.has-video .demo-frame-inner {
-    display: none;
-}
-
-.demo-frame.is-loading .demo-play-btn {
-    opacity: 0.6;
-    pointer-events: none;
-}
-
-.demo-frame-note code {
-    font-family: var(--font-mono);
-    font-size: 11px;
-    color: var(--secondary);
-}
-
 /* ── Sterling Gate navigation ── */
 .site-nav .nav-link {
     display: none;
@@ -170,7 +122,9 @@
     letter-spacing: 0.06em;
     text-transform: uppercase;
     cursor: pointer;
-    transition: background var(--transition), border-color var(--transition);
+    transition:
+        background var(--transition),
+        border-color var(--transition);
 }
 
 .sterling-menu-btn:hover {
@@ -314,10 +268,18 @@
     opacity: 1;
 }
 
-.sterling-overlay.is-open .sterling-menu-item:nth-child(1) .sterling-menu-link-text { transition-delay: 0.22s; }
-.sterling-overlay.is-open .sterling-menu-item:nth-child(2) .sterling-menu-link-text { transition-delay: 0.28s; }
-.sterling-overlay.is-open .sterling-menu-item:nth-child(3) .sterling-menu-link-text { transition-delay: 0.34s; }
-.sterling-overlay.is-open .sterling-menu-item:nth-child(4) .sterling-menu-link-text { transition-delay: 0.4s; }
+.sterling-overlay.is-open .sterling-menu-item:nth-child(1) .sterling-menu-link-text {
+    transition-delay: 0.22s;
+}
+.sterling-overlay.is-open .sterling-menu-item:nth-child(2) .sterling-menu-link-text {
+    transition-delay: 0.28s;
+}
+.sterling-overlay.is-open .sterling-menu-item:nth-child(3) .sterling-menu-link-text {
+    transition-delay: 0.34s;
+}
+.sterling-overlay.is-open .sterling-menu-item:nth-child(4) .sterling-menu-link-text {
+    transition-delay: 0.4s;
+}
 
 .sterling-menu-link-hover {
     position: absolute;
@@ -368,7 +330,9 @@
     background: radial-gradient(circle, rgba(196, 30, 58, 0.2) 0%, transparent 70%);
     transform: scale(0.6);
     opacity: 0;
-    transition: opacity 0.4s ease, transform 0.5s cubic-bezier(0.65, 0.01, 0.05, 0.99);
+    transition:
+        opacity 0.4s ease,
+        transform 0.5s cubic-bezier(0.65, 0.01, 0.05, 0.99);
 }
 
 .sterling-shape.is-active {
@@ -376,9 +340,24 @@
     transform: scale(1);
 }
 
-.sterling-shape-1 { width: 280px; height: 280px; top: 10%; right: 8%; }
-.sterling-shape-2 { width: 200px; height: 200px; bottom: 18%; left: 12%; }
-.sterling-shape-3 { width: 140px; height: 140px; top: 42%; left: 45%; }
+.sterling-shape-1 {
+    width: 280px;
+    height: 280px;
+    top: 10%;
+    right: 8%;
+}
+.sterling-shape-2 {
+    width: 200px;
+    height: 200px;
+    bottom: 18%;
+    left: 12%;
+}
+.sterling-shape-3 {
+    width: 140px;
+    height: 140px;
+    top: 42%;
+    left: 45%;
+}
 
 [data-block-reveal].gsap-ready .block-reveal-text,
 [data-block-reveal].gsap-ready .block-reveal-wipe {
@@ -441,8 +420,12 @@
 }
 
 @keyframes bento-marquee {
-    from { transform: translateX(0); }
-    to { transform: translateX(-33.333%); }
+    from {
+        transform: translateX(0);
+    }
+    to {
+        transform: translateX(-33.333%);
+    }
 }
 
 .bento-tag {
